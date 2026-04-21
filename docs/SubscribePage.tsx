@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "zudoku/hooks";
 
 interface Plan {
   id: string;
@@ -124,6 +125,7 @@ export function SubscribePage({ view: defaultView = "plans" }: SubscribePageProp
   const [subscriptions, setSubscriptions] = useState<Subscription[]>(loadSubscriptions);
   const [requesting, setRequesting] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
+  const auth = useAuth();
 
   const showToast = useCallback((message: string, type: "success" | "info" | "error" = "success") => {
     setToast({ message, type });
@@ -133,6 +135,12 @@ export function SubscribePage({ view: defaultView = "plans" }: SubscribePageProp
     subscriptions.find((s) => s.planId === planId);
 
   const requestAccess = async (plan: Plan) => {
+    // If not logged in, trigger login flow
+    if (!auth.isAuthenticated) {
+      auth.login();
+      return;
+    }
+
     if (requesting) return;
     const existing = getSubscriptionForPlan(plan.id);
     if (existing) return;
@@ -277,7 +285,11 @@ export function SubscribePage({ view: defaultView = "plans" }: SubscribePageProp
                           : "border border-border bg-background hover:bg-muted"
                       }`}
                     >
-                      {isRequesting ? "Requesting…" : "Request access"}
+                      {isRequesting
+                        ? "Requesting…"
+                        : !auth.isAuthenticated
+                        ? "Sign in to request access"
+                        : "Request access"}
                     </button>
                   )}
 
@@ -307,7 +319,18 @@ export function SubscribePage({ view: defaultView = "plans" }: SubscribePageProp
 
       {view === "subscriptions" && (
         <div>
-          {subscriptions.length === 0 ? (
+          {!auth.isAuthenticated ? (
+            <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+              <p className="text-lg font-medium">Sign in to view your subscriptions</p>
+              <p className="mt-1 text-sm">You need to be logged in to manage your API access.</p>
+              <button
+                onClick={() => auth.login()}
+                className="mt-4 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Sign in
+              </button>
+            </div>
+          ) : subscriptions.length === 0 ? (
             <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
               <p className="text-lg font-medium">No subscriptions yet</p>
               <p className="mt-1 text-sm">Request access to a plan to get started.</p>
