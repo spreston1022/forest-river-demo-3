@@ -13,16 +13,15 @@ const config: ZudokuConfig = {
   },
 
   authentication: {
-    type: "openid",
-    // TODO: Replace with your OIDC client ID
-    clientId: "TODO_YOUR_CLIENT_ID",
-    // TODO: Replace with your OIDC issuer URL
-    issuer: "TODO_YOUR_ISSUER_URL",
+    type: "auth0",
+    domain: "dev-l3ayzqncrfw3ta50.us.auth0.com",
+    clientId: "GgoZWZhD9XXpCJC771LkiKtnC3VRk0E9",
+    audience: "https://forest-river-demo",
   },
 
   apis: {
-    type: "url",
-    input: "https://forest-river-demo-main-fb06bf1.zuplo.app/openapi",
+    type: "file",
+    input: "../config/routes.oas.json",
     path: "/api",
   },
 
@@ -59,25 +58,25 @@ const config: ZudokuConfig = {
       label: "API Reference",
       icon: "code",
     },
+    // Plans are publicly visible — login is triggered on "Request access" click
     {
       type: "custom-page",
       path: "/subscribe",
       label: "Plans",
       icon: "credit-card",
       element: <SubscribePage view="plans" />,
-      display: "auth",
+      display: "always",
     },
+    // My Subscriptions only shown when logged in
     {
       type: "custom-page",
       path: "/my-subscriptions",
       label: "My Subscriptions",
       icon: "key",
       element: <SubscribePage view="subscriptions" />,
-      display: "auth",
+      display: "always",
     },
   ],
-
-  protectedRoutes: ["/subscribe", "/my-subscriptions"],
 
   plugins: [
     createApiIdentityPlugin({
