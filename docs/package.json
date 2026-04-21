@@ -1,0 +1,14 @@
+{
+  "name": "forest-river-dev-portal",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "zudoku dev --zuplo",
+    "build": "zudoku build",
+    "preview": "zudoku preview"
+  },
+  "dependencies": {
+    "zudoku": "latest"
+  }
+}
