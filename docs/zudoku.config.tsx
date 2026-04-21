@@ -22,7 +22,7 @@ const config: ZudokuConfig = {
 
   apis: {
     type: "url",
-    input: "TODO_YOUR_GATEWAY_URL/openapi",
+    input: "https://forest-river-demo-main-fb06bf1.zuplo.app/openapi",
     path: "/api",
   },
 
