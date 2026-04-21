@@ -1,23 +1,14 @@
 {
-  "name": "docs",
-  "version": "0.1.0",
-  "type": "module",
+  "name": "forest-river-dev-portal",
   "private": true,
+  "version": "0.0.1",
+  "type": "module",
   "scripts": {
     "dev": "zudoku dev --zuplo",
-    "build": "zudoku build --zuplo"
+    "build": "zudoku build",
+    "preview": "zudoku preview"
   },
   "dependencies": {
-    "react": "^19",
-    "react-dom": "^19",
-    "@mdx-js/react": "3.0.1",
-    "@zuplo/zudoku-plugin-monetization": "^0.0",
-    "zudoku": "^0.75"
-  },
-  "devDependencies": {
-    "@types/node": "^22",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "typescript": "^5"
+    "zudoku": "latest"
   }
 }
