@@ -7,7 +7,9 @@
   },
   "paths": {
     "/path-1": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "get": {
         "summary": "Echo endpoint",
         "description": "Forwards to echo.zuplo.io — requires a valid API key.",
@@ -17,19 +19,30 @@
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "baseUrl": "https://echo.zuplo.io" }
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
           },
-          "policies": { "inbound": ["api-key-inbound"] }
+          "policies": {
+            "inbound": [
+              "api-key-inbound"
+            ]
+          }
         },
         "responses": {
-          "200": { "description": "Successful response from echo service" },
-          "401": { "description": "Unauthorized" }
+          "200": {
+            "description": "Successful response from echo service"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
-
     "/openapi": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "get": {
         "summary": "OpenAPI Specification",
         "operationId": "get-openapi",
@@ -38,16 +51,26 @@
           "handler": {
             "export": "openApiSpecHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "openApiFilePath": "./config/routes.oas.json" }
+            "options": {
+              "openApiFilePath": "./config/routes.oas.json"
+            }
           },
-          "policies": { "inbound": [] }
+          "policies": {
+            "inbound": []
+          }
         },
-        "responses": { "200": { "description": "OpenAPI specification" } }
+        "responses": {
+          "200": {
+            "description": "OpenAPI specification"
+          }
+        },
+        "description": ""
       }
     },
-
     "/subscriptions": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "post": {
         "summary": "Submit subscription request",
         "operationId": "create-subscription",
@@ -57,11 +80,19 @@
             "export": "createSubscription",
             "module": "$import(./modules/subscriptions)"
           },
-          "policies": { "inbound": ["jwt-auth-inbound"] }
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
         },
         "responses": {
-          "201": { "description": "Subscription request created" },
-          "401": { "description": "Unauthorized" }
+          "201": {
+            "description": "Subscription request created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       },
       "get": {
@@ -73,17 +104,26 @@
             "export": "getMySubscriptions",
             "module": "$import(./modules/subscriptions)"
           },
-          "policies": { "inbound": ["jwt-auth-inbound"] }
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
         },
         "responses": {
-          "200": { "description": "List of consumer's subscriptions" },
-          "401": { "description": "Unauthorized" }
+          "200": {
+            "description": "List of consumer's subscriptions"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
-
     "/admin/subscriptions": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "get": {
         "summary": "Admin — get all subscription requests",
         "operationId": "admin-get-subscriptions",
@@ -93,18 +133,30 @@
             "export": "adminGetSubscriptions",
             "module": "$import(./modules/subscriptions)"
           },
-          "policies": { "inbound": ["jwt-auth-inbound", "admin-auth-inbound"] }
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
         },
         "responses": {
-          "200": { "description": "All subscription requests" },
-          "401": { "description": "Unauthorized" },
-          "403": { "description": "Forbidden" }
+          "200": {
+            "description": "All subscription requests"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
         }
       }
     },
-
     "/admin/subscriptions/:id/approve": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "post": {
         "summary": "Admin — approve subscription",
         "operationId": "admin-approve-subscription",
@@ -114,19 +166,33 @@
             "export": "adminApproveSubscription",
             "module": "$import(./modules/subscriptions)"
           },
-          "policies": { "inbound": ["jwt-auth-inbound", "admin-auth-inbound"] }
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
         },
         "responses": {
-          "200": { "description": "Subscription approved and key provisioned" },
-          "401": { "description": "Unauthorized" },
-          "403": { "description": "Forbidden" },
-          "404": { "description": "Not found" }
+          "200": {
+            "description": "Subscription approved and key provisioned"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
         }
       }
     },
-
     "/admin/subscriptions/:id/reject": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "post": {
         "summary": "Admin — reject subscription",
         "operationId": "admin-reject-subscription",
@@ -136,13 +202,26 @@
             "export": "adminRejectSubscription",
             "module": "$import(./modules/subscriptions)"
           },
-          "policies": { "inbound": ["jwt-auth-inbound", "admin-auth-inbound"] }
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
         },
         "responses": {
-          "200": { "description": "Subscription rejected" },
-          "401": { "description": "Unauthorized" },
-          "403": { "description": "Forbidden" },
-          "404": { "description": "Not found" }
+          "200": {
+            "description": "Subscription rejected"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
         }
       }
     }

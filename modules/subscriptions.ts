@@ -1,27 +1,18 @@
 /**
  * modules/subscriptions.ts
  *
- * Uses Zuplo's own API key consumer service as the data store.
- * No external dependencies needed.
- *
- * Flow:
- *   - POST /subscriptions    → create consumer (no key yet) with tag status=pending
- *   - GET  /subscriptions    → list consumers by subject (Auth0 sub), return their status + key
- *   - GET  /admin/subscriptions          → list all consumers with tag status=pending or status=active
- *   - POST /admin/subscriptions/:id/approve → create API key for consumer, update tag to status=active
- *   - POST /admin/subscriptions/:id/reject  → update consumer tag to status=rejected
+ * Uses Zuplo's API key consumer service as the data store.
+ * Correct API: https://dev.zuplo.com/v1/accounts/{account}/key-buckets/{bucket}/consumers
  *
  * Env vars required:
- *   API_KEY     — Zuplo management API key
- *   BUCKET_NAME — Zuplo API key bucket name
+ *   API_KEY     — Zuplo management API key (zpka_...)
+ *   BUCKET_NAME — Zuplo API key bucket name (zprj-...)
  */
 
 import { ZuploContext, ZuploRequest, environment } from "@zuplo/runtime";
 
 const ZUPLO_ACCOUNT = "lavender-outstanding-bear";
-const ZUPLO_PROJECT = "forest-river-demo";
-const ZUPLO_ENV = "working-copy";
-const BASE = `https://api.zuplo.com/v1/accounts/${ZUPLO_ACCOUNT}/projects/${ZUPLO_PROJECT}/environments/${ZUPLO_ENV}`;
+const BASE = `https://dev.zuplo.com/v1/accounts/${ZUPLO_ACCOUNT}/key-buckets`;
 
 // ─── Zuplo management API helpers ────────────────────────────────────────────
 
@@ -32,14 +23,18 @@ function zuploHeaders() {
   };
 }
 
+function bucket() {
+  return environment.BUCKET_NAME;
+}
+
 async function zuploGet(path: string) {
-  const res = await fetch(`${BASE}${path}`, { headers: zuploHeaders() });
+  const res = await fetch(`${BASE}/${bucket()}${path}`, { headers: zuploHeaders() });
   if (!res.ok) throw new Error(`Zuplo GET ${path} failed: ${await res.text()}`);
   return res.json();
 }
 
 async function zuploPost(path: string, body: unknown) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${BASE}/${bucket()}${path}`, {
     method: "POST",
     headers: zuploHeaders(),
     body: JSON.stringify(body),
@@ -49,7 +44,7 @@ async function zuploPost(path: string, body: unknown) {
 }
 
 async function zuploPatch(path: string, body: unknown) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${BASE}/${bucket()}${path}`, {
     method: "PATCH",
     headers: zuploHeaders(),
     body: JSON.stringify(body),
@@ -62,39 +57,43 @@ async function zuploPatch(path: string, body: unknown) {
 
 interface ZuploConsumer {
   id: string;
-  subject: string;
-  description: string;
-  tags: Record<string, string>;
-  metadata: Record<string, string>;
+  name: string;
+  description?: string;
+  tags?: Record<string, string>;
+  metadata?: Record<string, string>;
   apiKeys?: { id: string; key?: string }[];
 }
 
-async function listConsumers(tag?: string): Promise<ZuploConsumer[]> {
-  const qs = tag ? `?tag.${tag}` : "";
-  const data = await zuploGet(`/api-key-consumers${qs}`) as { data: ZuploConsumer[] };
+interface ConsumerList {
+  data: ZuploConsumer[];
+}
+
+async function listConsumers(): Promise<ZuploConsumer[]> {
+  const data = await zuploGet("/consumers?limit=1000") as ConsumerList;
   return data.data ?? [];
 }
 
-async function getConsumersBySubject(subject: string): Promise<ZuploConsumer[]> {
-  const all = await listConsumers();
-  return all.filter(c => c.subject === subject);
+async function getConsumerWithKey(consumerName: string): Promise<ZuploConsumer> {
+  return zuploGet(`/consumers/${consumerName}?include-api-keys=true&key-format=visible`) as Promise<ZuploConsumer>;
 }
 
-async function getConsumerWithKey(consumerId: string): Promise<ZuploConsumer> {
-  return zuploGet(`/api-key-consumers/${consumerId}?include-api-keys=true`) as Promise<ZuploConsumer>;
+// Sanitize Auth0 sub to a valid consumer name (lowercase alphanumeric + hyphens, max 128 chars)
+function subToConsumerName(sub: string, planId: string): string {
+  const sanitized = sub.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 100);
+  return `${sanitized}-${planId}`;
 }
 
-function consumerToSubscription(c: ZuploConsumer, key?: string) {
+function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
   return {
-    id: c.id,
-    planId: c.tags["plan"] ?? "basic",
-    planName: c.metadata["planName"] ?? c.tags["plan"] ?? "Basic",
-    userId: c.subject,
-    userEmail: c.metadata["email"] ?? "",
-    status: c.tags["status"] ?? "pending",
-    apiKey: key,
-    requestedAt: c.metadata["requestedAt"] ?? new Date().toISOString(),
-    resolvedAt: c.metadata["resolvedAt"],
+    id: c.name, // use name as stable ID for admin actions
+    planId: c.tags?.["plan"] ?? "basic",
+    planName: c.metadata?.["planName"] ?? c.tags?.["plan"] ?? "Basic",
+    userId: c.metadata?.["userId"] ?? "",
+    userEmail: c.metadata?.["email"] ?? "",
+    status: c.tags?.["status"] ?? "pending",
+    apiKey,
+    requestedAt: c.metadata?.["requestedAt"] ?? new Date().toISOString(),
+    resolvedAt: c.metadata?.["resolvedAt"],
   };
 }
 
@@ -111,36 +110,33 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
   const body = await request.json() as { planId: string; planName: string };
   const { planId, planName } = body;
 
-  // Check if consumer already exists for this user+plan
-  const existing = await getConsumersBySubject(userId);
-  const existingForPlan = existing.find(c => c.tags["plan"] === planId && c.tags["status"] !== "rejected");
-  if (existingForPlan) {
-    // Return existing subscription with key if active
-    if (existingForPlan.tags["status"] === "active") {
-      const withKey = await getConsumerWithKey(existingForPlan.id);
-      const key = withKey.apiKeys?.[0]?.key;
-      return new Response(JSON.stringify(consumerToSubscription(existingForPlan, key)), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify(consumerToSubscription(existingForPlan)), {
+  const consumerName = subToConsumerName(userId, planId);
+
+  // Check if consumer already exists
+  try {
+    const existing = await getConsumerWithKey(consumerName);
+    const apiKey = existing.tags?.["status"] === "active"
+      ? existing.apiKeys?.[0]?.key
+      : undefined;
+    return new Response(JSON.stringify(consumerToSubscription(existing, apiKey)), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
+  } catch {
+    // Consumer doesn't exist yet — create it
   }
 
   const isBasic = planId === "basic";
 
-  // Create consumer (without key for pro/enterprise, with key for basic)
-  const consumer = await zuploPost(`/api-key-consumers${isBasic ? "?with-api-key=true" : ""}`, {
-    subject: userId,
+  const consumer = await zuploPost(`/consumers${isBasic ? "?with-api-key=true" : ""}`, {
+    name: consumerName,
     description: `${userEmail} — ${planName} plan`,
     tags: {
       plan: planId,
       status: isBasic ? "active" : "pending",
     },
     metadata: {
+      userId,
       email: userEmail,
       planName,
       requestedAt: new Date().toISOString(),
@@ -163,13 +159,15 @@ export async function getMySubscriptions(request: ZuploRequest, context: ZuploCo
   }
 
   const userId = request.user.sub!;
-  const consumers = await getConsumersBySubject(userId);
+  const all = await listConsumers();
 
-  // Fetch keys for active consumers
+  // Filter consumers belonging to this user by metadata.userId
+  const mine = all.filter(c => c.metadata?.["userId"] === userId);
+
   const subscriptions = await Promise.all(
-    consumers.map(async (c) => {
-      if (c.tags["status"] === "active") {
-        const withKey = await getConsumerWithKey(c.id);
+    mine.map(async (c) => {
+      if (c.tags?.["status"] === "active") {
+        const withKey = await getConsumerWithKey(c.name);
         return consumerToSubscription(c, withKey.apiKeys?.[0]?.key);
       }
       return consumerToSubscription(c);
@@ -182,7 +180,7 @@ export async function getMySubscriptions(request: ZuploRequest, context: ZuploCo
   });
 }
 
-/** GET /admin/subscriptions — admin sees all pending + active */
+/** GET /admin/subscriptions — admin sees all consumers */
 export async function adminGetSubscriptions(request: ZuploRequest, context: ZuploContext) {
   if (!request.user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
@@ -203,16 +201,15 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
-  const consumerId = request.params.id;
+  const consumerName = request.params.id;
 
-  // Create API key for this consumer
-  const keyData = await zuploPost(`/api-key-consumers/${consumerId}/api-keys`, {
+  // Create API key for consumer
+  const keyData = await zuploPost(`/consumers/${consumerName}/api-keys`, {
     description: "Approved subscription key",
-    bucketName: environment.BUCKET_NAME,
   }) as { key: string };
 
-  // Update consumer tags to mark as active
-  const updated = await zuploPatch(`/api-key-consumers/${consumerId}`, {
+  // Update status to active
+  const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { status: "active" },
     metadata: { resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
@@ -229,9 +226,9 @@ export async function adminRejectSubscription(request: ZuploRequest, context: Zu
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
-  const consumerId = request.params.id;
+  const consumerName = request.params.id;
 
-  const updated = await zuploPatch(`/api-key-consumers/${consumerId}`, {
+  const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { status: "rejected" },
     metadata: { resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
