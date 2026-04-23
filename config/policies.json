@@ -32,5 +32,18 @@
         "module": "$import(./modules/admin-auth)"
       }
     }
+  ],
+  "corsPolicies": [
+    {
+      "name": "portal-cors",
+      "allowedOrigins": [
+        "https://forest-river-demo-main-fb06bf1.zuplo.site",
+        "https://forest-river-demo-main-5ef061c.zuplo.site"
+      ],
+      "allowedMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      "allowedHeaders": ["Authorization", "Content-Type"],
+      "allowCredentials": true,
+      "maxAge": 86400
+    }
   ]
 }
