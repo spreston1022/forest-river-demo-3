@@ -1,13 +1,18 @@
 /**
  * modules/admin-auth.ts
  *
- * Restricts admin routes to sam@zuplo.com.
- * Checks multiple claim locations since Auth0 may place email differently.
+ * Restricts admin routes to the configured admin user.
+ * Uses sub (Auth0 user ID) instead of email since email
+ * is not included in the access token by default.
+ *
+ * To find your sub: check the Zuplo logs after any authenticated
+ * request — it appears as user.sub in the JWT.
  */
 
 import { ZuploContext, ZuploRequest } from "@zuplo/runtime";
 
-const ADMIN_EMAIL = "sam@zuplo.com";
+// sam@zuplo.com's Auth0 sub — from the JWT logs
+const ADMIN_SUB = "auth0|69e72c26c61be620e134af9b";
 
 export default async function adminAuth(
   request: ZuploRequest,
@@ -24,32 +29,11 @@ export default async function adminAuth(
     });
   }
 
-  // Log all user data to help debug claim location
-  context.log.info("admin-auth user.sub", user.sub);
-  context.log.info("admin-auth user.data", JSON.stringify(user.data));
-
-  const data = user.data as any;
-
-  // Auth0 may place email in different locations depending on configuration
-  const email =
-    data?.email ||
-    data?.["https://forest-river-demo/email"] ||
-    data?.["email"] ||
-    null;
-
-  context.log.info("admin-auth resolved email", email);
-
-  if (email !== ADMIN_EMAIL) {
-    return new Response(
-      JSON.stringify({
-        error: "Forbidden — admin only",
-        debug: { sub: user.sub, email, data },
-      }),
-      {
-        status: 403,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+  if (user.sub !== ADMIN_SUB) {
+    return new Response(JSON.stringify({ error: "Forbidden — admin only" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   return request;
