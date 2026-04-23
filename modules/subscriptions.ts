@@ -2,7 +2,7 @@
  * modules/subscriptions.ts
  *
  * Uses Zuplo's API key consumer service as the data store.
- * Correct API: https://dev.zuplo.com/v1/accounts/{account}/key-buckets/{bucket}/consumers
+ * Fetches email from Auth0 userinfo endpoint since it's not in the access token.
  *
  * Env vars required:
  *   API_KEY     — Zuplo management API key (zpka_...)
@@ -13,6 +13,26 @@ import { ZuploContext, ZuploRequest, environment } from "@zuplo/runtime";
 
 const ZUPLO_ACCOUNT = "lavender-outstanding-bear";
 const BASE = `https://dev.zuplo.com/v1/accounts/${ZUPLO_ACCOUNT}/key-buckets`;
+const AUTH0_DOMAIN = "dev-l3ayzqncrfw3ta50.us.auth0.com";
+
+// ─── Auth0 userinfo helper ────────────────────────────────────────────────────
+
+async function getUserEmail(request: ZuploRequest): Promise<string> {
+  try {
+    const authHeader = request.headers.get("Authorization") ?? "";
+    const token = authHeader.replace("Bearer ", "");
+    if (!token) return "";
+
+    const res = await fetch(`https://${AUTH0_DOMAIN}/userinfo`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return "";
+    const profile = await res.json() as { email?: string };
+    return profile.email ?? "";
+  } catch {
+    return "";
+  }
+}
 
 // ─── Zuplo management API helpers ────────────────────────────────────────────
 
@@ -77,7 +97,6 @@ async function getConsumerWithKey(consumerName: string): Promise<ZuploConsumer> 
   return zuploGet(`/consumers/${consumerName}?include-api-keys=true&key-format=visible`) as Promise<ZuploConsumer>;
 }
 
-// Sanitize Auth0 sub to a valid consumer name (lowercase alphanumeric + hyphens, max 128 chars)
 function subToConsumerName(sub: string, planId: string): string {
   const sanitized = sub.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 100);
   return `${sanitized}-${planId}`;
@@ -85,7 +104,7 @@ function subToConsumerName(sub: string, planId: string): string {
 
 function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
   return {
-    id: c.name, // use name as stable ID for admin actions
+    id: c.name,
     planId: c.tags?.["plan"] ?? "basic",
     planName: c.metadata?.["planName"] ?? c.tags?.["plan"] ?? "Basic",
     userId: c.metadata?.["userId"] ?? "",
@@ -106,7 +125,8 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
   }
 
   const userId = request.user.sub!;
-  const userEmail = (request.user.data as any)?.email ?? "";
+  // Fetch email from Auth0 userinfo since it's not in the access token
+  const userEmail = await getUserEmail(request);
   const body = await request.json() as { planId: string; planName: string };
   const { planId, planName } = body;
 
@@ -160,8 +180,6 @@ export async function getMySubscriptions(request: ZuploRequest, context: ZuploCo
 
   const userId = request.user.sub!;
   const all = await listConsumers();
-
-  // Filter consumers belonging to this user by metadata.userId
   const mine = all.filter(c => c.metadata?.["userId"] === userId);
 
   const subscriptions = await Promise.all(
@@ -203,12 +221,10 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
 
   const consumerName = request.params.id;
 
-  // Create API key for consumer
   const keyData = await zuploPost(`/consumers/${consumerName}/api-keys`, {
     description: "Approved subscription key",
   }) as { key: string };
 
-  // Update status to active
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { status: "active" },
     metadata: { resolvedAt: new Date().toISOString() },
