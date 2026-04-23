@@ -1,8 +1,8 @@
 /**
  * modules/admin-auth.ts
  *
- * Inbound policy that restricts access to admin routes.
- * Only allows requests from the configured admin email.
+ * Restricts admin routes to sam@zuplo.com.
+ * Checks multiple claim locations since Auth0 may place email differently.
  */
 
 import { ZuploContext, ZuploRequest } from "@zuplo/runtime";
@@ -24,12 +24,32 @@ export default async function adminAuth(
     });
   }
 
-  const email = (user.data as any)?.email;
+  // Log all user data to help debug claim location
+  context.log.info("admin-auth user.sub", user.sub);
+  context.log.info("admin-auth user.data", JSON.stringify(user.data));
+
+  const data = user.data as any;
+
+  // Auth0 may place email in different locations depending on configuration
+  const email =
+    data?.email ||
+    data?.["https://forest-river-demo/email"] ||
+    data?.["email"] ||
+    null;
+
+  context.log.info("admin-auth resolved email", email);
+
   if (email !== ADMIN_EMAIL) {
-    return new Response(JSON.stringify({ error: "Forbidden — admin only" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Forbidden — admin only",
+        debug: { sub: user.sub, email, data },
+      }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   return request;
