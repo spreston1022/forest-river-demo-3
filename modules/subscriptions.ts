@@ -148,7 +148,7 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
 
   const isBasic = planId === "basic";
 
-  const consumer = await zuploPost(`/consumers${isBasic ? "?with-api-key=true" : ""}`, {
+  const consumer = await zuploPost(`/consumers`, {
     name: consumerName,
     description: `${userEmail} — ${planName} plan`,
     tags: {
@@ -162,9 +162,15 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
       requestedAt: new Date().toISOString(),
       ...(isBasic ? { resolvedAt: new Date().toISOString() } : {}),
     },
-  }) as ZuploConsumer & { apiKeys?: { key: string }[] };
+  }) as ZuploConsumer;
 
-  const apiKey = isBasic ? consumer.apiKeys?.[0]?.key : undefined;
+  let apiKey: string | undefined;
+  if (isBasic) {
+    const keyData = await zuploPost(`/consumers/${consumerName}/keys`, {
+      description: `${planId} key for ${userEmail}`,
+    }) as { key: string };
+    apiKey = keyData.key;
+  }
 
   return new Response(JSON.stringify(consumerToSubscription(consumer, apiKey)), {
     status: 201,
@@ -221,7 +227,7 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
 
   const consumerName = request.params.id;
 
-  const keyData = await zuploPost(`/consumers/${consumerName}/api-keys`, {
+  const keyData = await zuploPost(`/consumers/${consumerName}/keys`, {
     description: "Approved subscription key",
   }) as { key: string };
 
