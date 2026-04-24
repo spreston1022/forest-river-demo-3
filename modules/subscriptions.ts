@@ -188,13 +188,18 @@ export async function getMySubscriptions(request: ZuploRequest, context: ZuploCo
   const all = await listConsumers();
   const mine = all.filter(c => c.metadata?.["userId"] === userId);
 
+  // Always fetch full consumer details to get latest status and key
   const subscriptions = await Promise.all(
     mine.map(async (c) => {
-      if (c.tags?.["status"] === "active") {
+      try {
         const withKey = await getConsumerWithKey(c.name);
-        return consumerToSubscription(c, withKey.apiKeys?.[0]?.key);
+        const apiKey = withKey.tags?.["status"] === "active"
+          ? withKey.apiKeys?.[0]?.key
+          : undefined;
+        return consumerToSubscription(withKey, apiKey);
+      } catch {
+        return consumerToSubscription(c);
       }
-      return consumerToSubscription(c);
     })
   );
 
