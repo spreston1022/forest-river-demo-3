@@ -232,13 +232,17 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
 
   const consumerName = request.params.id;
 
+  // Fetch existing consumer to get current metadata before patching
+  const existing = await getConsumerWithKey(consumerName);
+
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, {
     description: "Approved subscription key",
   }) as { key: string };
 
+  // Merge existing metadata with resolvedAt — don't overwrite userId/email
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
-    tags: { status: "active" },
-    metadata: { resolvedAt: new Date().toISOString() },
+    tags: { ...existing.tags, status: "active" },
+    metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
 
   return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), {
@@ -255,9 +259,11 @@ export async function adminRejectSubscription(request: ZuploRequest, context: Zu
 
   const consumerName = request.params.id;
 
+  const existing = await getConsumerWithKey(consumerName);
+
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
-    tags: { status: "rejected" },
-    metadata: { resolvedAt: new Date().toISOString() },
+    tags: { ...existing.tags, status: "rejected" },
+    metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
 
   return new Response(JSON.stringify(consumerToSubscription(updated)), {
