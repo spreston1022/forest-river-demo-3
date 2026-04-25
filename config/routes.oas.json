@@ -33,6 +33,7 @@
       "get": {
         "summary": "OpenAPI Specification",
         "operationId": "get-openapi",
+        "x-internal": true,
         "x-zuplo-route": {
           "corsPolicy": "none",
           "handler": {
@@ -51,6 +52,7 @@
       "post": {
         "summary": "Submit subscription request",
         "operationId": "create-subscription",
+        "x-internal": true,
         "x-zuplo-route": {
           "corsPolicy": "portal-cors",
           "handler": {
@@ -67,6 +69,7 @@
       "get": {
         "summary": "Get my subscriptions",
         "operationId": "get-my-subscriptions",
+        "x-internal": true,
         "x-zuplo-route": {
           "corsPolicy": "portal-cors",
           "handler": {
@@ -87,6 +90,7 @@
       "get": {
         "summary": "Admin — get all subscription requests",
         "operationId": "admin-get-subscriptions",
+        "x-internal": true,
         "x-zuplo-route": {
           "corsPolicy": "portal-cors",
           "handler": {
@@ -108,6 +112,7 @@
       "post": {
         "summary": "Admin — approve subscription",
         "operationId": "admin-approve-subscription",
+        "x-internal": true,
         "x-zuplo-route": {
           "corsPolicy": "portal-cors",
           "handler": {
@@ -130,6 +135,7 @@
       "post": {
         "summary": "Admin — reject subscription",
         "operationId": "admin-reject-subscription",
+        "x-internal": true,
         "x-zuplo-route": {
           "corsPolicy": "portal-cors",
           "handler": {
