@@ -79,9 +79,7 @@ const config: ZudokuConfig = {
       element: <AdminPage />,
       display: ({ auth }) => {
         const profile = auth.profile as any;
-        console.log("auth.profile", JSON.stringify(profile));
-        const roles: string[] = profile?.roles ?? profile?.["https://forest-river-demo/roles"] ?? [];
-        console.log("resolved roles", roles);
+        const roles: string[] = profile?.["https://forest-river-demo/roles"] ?? [];
         return roles.includes("api-admin");
       },
     },

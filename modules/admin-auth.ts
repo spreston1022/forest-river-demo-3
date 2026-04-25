@@ -1,8 +1,8 @@
 /**
  * modules/admin-auth.ts
  *
- * Restricts admin routes to users with the "api-admin" role in their JWT.
- * Role is added via an Auth0 Post Login Action.
+ * Restricts admin routes to users with the "api-admin" role.
+ * Role is added via Auth0 Post Login Action using a namespaced claim.
  */
 
 import { ZuploContext, ZuploRequest } from "@zuplo/runtime";
@@ -23,7 +23,8 @@ export default async function adminAuth(
   }
 
   const data = user.data as any;
-  const roles: string[] = data?.roles ?? data?.["https://forest-river-demo/roles"] ?? [];
+  // Auth0 requires namespaced custom claims — check namespaced key
+  const roles: string[] = data?.["https://forest-river-demo/roles"] ?? [];
 
   if (!roles.includes("api-admin")) {
     return new Response(JSON.stringify({ error: "Forbidden — admin only" }), {
