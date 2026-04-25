@@ -1,18 +1,11 @@
 /**
  * modules/admin-auth.ts
  *
- * Restricts admin routes to the configured admin user.
- * Uses sub (Auth0 user ID) instead of email since email
- * is not included in the access token by default.
- *
- * To find your sub: check the Zuplo logs after any authenticated
- * request — it appears as user.sub in the JWT.
+ * Restricts admin routes to users with the "api-admin" role in their JWT.
+ * Role is added via an Auth0 Post Login Action.
  */
 
 import { ZuploContext, ZuploRequest } from "@zuplo/runtime";
-
-// sam@zuplo.com's Auth0 sub — from the JWT logs
-const ADMIN_SUB = "auth0|69e72c26c61be620e134af9b";
 
 export default async function adminAuth(
   request: ZuploRequest,
@@ -29,7 +22,10 @@ export default async function adminAuth(
     });
   }
 
-  if (user.sub !== ADMIN_SUB) {
+  const data = user.data as any;
+  const roles: string[] = data?.roles ?? data?.["https://forest-river-demo/roles"] ?? [];
+
+  if (!roles.includes("api-admin")) {
     return new Response(JSON.stringify({ error: "Forbidden — admin only" }), {
       status: 403,
       headers: { "Content-Type": "application/json" },

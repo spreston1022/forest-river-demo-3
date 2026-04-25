@@ -32,6 +32,14 @@ const config: ZudokuConfig = {
 
   navigation: [
     {
+      // Serve introduction.md at the root path so / doesn't 404
+      type: "doc",
+      file: "introduction",
+      path: "/",
+      label: "Home",
+      display: "hide", // Hidden from nav but accessible at /
+    },
+    {
       type: "category",
       label: "Documentation",
       icon: "book",
@@ -69,10 +77,11 @@ const config: ZudokuConfig = {
       label: "Admin",
       icon: "shield",
       element: <AdminPage />,
-      // Only show nav item to admin user — page itself also enforces this
+      // Only show to users with the api-admin role in their profile
       display: ({ auth }) => {
-        const email = (auth.profile as any)?.email;
-        return email === "sam@zuplo.com";
+        const profile = auth.profile as any;
+        const roles: string[] = profile?.roles ?? profile?.["https://forest-river-demo/roles"] ?? [];
+        return roles.includes("api-admin");
       },
     },
   ],
