@@ -32,12 +32,12 @@ const config: ZudokuConfig = {
 
   navigation: [
     {
-      // Serve introduction.md at the root path so / doesn't 404
+      // Serve introduction.md at root so / doesn't 404
       type: "doc",
       file: "introduction",
       path: "/",
       label: "Home",
-      display: "hide", // Hidden from nav but accessible at /
+      display: "hide",
     },
     {
       type: "category",
@@ -77,10 +77,11 @@ const config: ZudokuConfig = {
       label: "Admin",
       icon: "shield",
       element: <AdminPage />,
-      // Only show to users with the api-admin role in their profile
       display: ({ auth }) => {
         const profile = auth.profile as any;
+        console.log("auth.profile", JSON.stringify(profile));
         const roles: string[] = profile?.roles ?? profile?.["https://forest-river-demo/roles"] ?? [];
+        console.log("resolved roles", roles);
         return roles.includes("api-admin");
       },
     },
