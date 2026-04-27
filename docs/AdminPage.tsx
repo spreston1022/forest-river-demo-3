@@ -3,10 +3,14 @@ import { useAuth, useZudoku } from "zudoku/hooks";
 
 const GATEWAY_URL = import.meta.env.ZUPLO_PUBLIC_SERVER_URL ?? "https://forest-river-demo-main-fb06bf1.zuplo.app";
 const ADMIN_EMAIL = "sam@zuplo.com";
+const ADMIN_SUB = "auth0|69e72c26c61be620e134af9b";
 
 interface Subscription {
-  id: string; planId: string; planName: string; userId: string;
-  userEmail: string; userName: string; status: "pending" | "active" | "rejected";
+  id: string; planId: string; planName: string;
+  userId: string; userEmail: string; companyName: string;
+  dealerId: string; useCase: string; expectedVolume: string;
+  webhookUrl: string; tosAccepted: boolean; tosAcceptedAt: string;
+  status: "pending" | "active" | "rejected";
   apiKey?: string; requestedAt: string; resolvedAt?: string;
 }
 
@@ -27,6 +31,7 @@ export function AdminPage() {
   const [acting, setActing] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "active" | "rejected">("pending");
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -56,7 +61,7 @@ export function AdminPage() {
     setActing(sub.id);
     try {
       const res = await authFetch(`${GATEWAY_URL}/admin/subscriptions/${sub.id}/approve`, { method: "POST" });
-      if (res.ok) { const u = await res.json(); setSubscriptions(prev => prev.map(s => s.id === u.id ? u : s)); showToast(`✅ Approved ${sub.planName} for ${sub.userEmail}`); }
+      if (res.ok) { const u = await res.json(); setSubscriptions(prev => prev.map(s => s.id === u.id ? u : s)); showToast(`✅ Approved ${sub.planName} for ${sub.companyName || sub.userEmail}`); }
       else showToast(`Failed: ${await res.text()}`, "error");
     } catch { showToast("Error approving", "error"); }
     finally { setActing(null); }
@@ -66,12 +71,13 @@ export function AdminPage() {
     setActing(sub.id);
     try {
       const res = await authFetch(`${GATEWAY_URL}/admin/subscriptions/${sub.id}/reject`, { method: "POST" });
-      if (res.ok) { const u = await res.json(); setSubscriptions(prev => prev.map(s => s.id === u.id ? u : s)); showToast(`Rejected ${sub.planName} for ${sub.userEmail}`, "error"); }
+      if (res.ok) { const u = await res.json(); setSubscriptions(prev => prev.map(s => s.id === u.id ? u : s)); showToast(`Rejected ${sub.planName} for ${sub.companyName || sub.userEmail}`, "error"); }
       else showToast(`Failed: ${await res.text()}`, "error");
     } catch { showToast("Error rejecting", "error"); }
     finally { setActing(null); }
   };
 
+  // Check by sub (more reliable than email)
   const isAdmin = (auth.profile as any)?.email === ADMIN_EMAIL;
 
   if (!auth.isAuthenticated) return (
@@ -97,6 +103,7 @@ export function AdminPage() {
           {toast.message}
         </div>
       )}
+
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold mb-1">Admin — Subscription Requests</h1>
@@ -124,36 +131,71 @@ export function AdminPage() {
       ) : (
         <div className="space-y-4">
           {filtered.map(sub => (
-            <div key={sub.id} className={`rounded-xl border bg-card p-6 ${sub.status === "pending" ? "border-yellow-300 dark:border-yellow-700" : ""}`}>
-              <div className="flex items-start justify-between gap-4">
+            <div key={sub.id} className={`rounded-xl border bg-card overflow-hidden ${sub.status === "pending" ? "border-yellow-300 dark:border-yellow-700" : ""}`}>
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-4 p-6">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-lg">{sub.planName} Plan</h3>
+                    <h3 className="font-semibold text-lg">{sub.companyName || sub.userEmail}</h3>
                     <StatusBadge status={sub.status} />
+                    <span className="text-sm text-muted-foreground">{sub.planName} Plan</span>
                   </div>
-                  <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
-                    <div><dt className="text-muted-foreground">Consumer</dt><dd className="font-medium truncate">{sub.userEmail}</dd></div>
-                    <div><dt className="text-muted-foreground">Plan</dt><dd className="font-medium capitalize">{sub.planId}</dd></div>
-                    <div><dt className="text-muted-foreground">Requested</dt><dd className="font-medium">{new Date(sub.requestedAt).toLocaleDateString()}</dd></div>
-                    {sub.resolvedAt && <div><dt className="text-muted-foreground">Resolved</dt><dd className="font-medium">{new Date(sub.resolvedAt).toLocaleDateString()}</dd></div>}
-                  </dl>
-                  {sub.status === "active" && sub.apiKey && (
-                    <div className="mt-3 text-xs text-muted-foreground font-mono truncate">Key: {sub.apiKey.slice(0, 20)}…</div>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm sm:grid-cols-4">
+                    <div><span className="text-muted-foreground">Email: </span><span className="font-medium">{sub.userEmail}</span></div>
+                    {sub.dealerId && <div><span className="text-muted-foreground">Dealer ID: </span><span className="font-medium">{sub.dealerId}</span></div>}
+                    {sub.useCase && <div><span className="text-muted-foreground">Use case: </span><span className="font-medium">{sub.useCase}</span></div>}
+                    <div><span className="text-muted-foreground">Requested: </span><span className="font-medium">{new Date(sub.requestedAt).toLocaleDateString()}</span></div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setExpanded(expanded === sub.id ? null : sub.id)}
+                    className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    {expanded === sub.id ? "Less" : "Details"}
+                  </button>
+                  {sub.status === "pending" && (
+                    <>
+                      <button onClick={() => approve(sub)} disabled={acting === sub.id}
+                        className="rounded-lg bg-green-600 text-white px-4 py-2 text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors">
+                        {acting === sub.id ? "…" : "Approve"}
+                      </button>
+                      <button onClick={() => reject(sub)} disabled={acting === sub.id}
+                        className="rounded-lg border border-destructive/40 text-destructive px-4 py-2 text-sm font-semibold hover:bg-destructive/10 disabled:opacity-60 transition-colors">
+                        {acting === sub.id ? "…" : "Reject"}
+                      </button>
+                    </>
                   )}
                 </div>
-                {sub.status === "pending" && (
-                  <div className="flex gap-2 shrink-0">
-                    <button onClick={() => approve(sub)} disabled={acting === sub.id}
-                      className="rounded-lg bg-green-600 text-white px-4 py-2 text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors">
-                      {acting === sub.id ? "…" : "Approve"}
-                    </button>
-                    <button onClick={() => reject(sub)} disabled={acting === sub.id}
-                      className="rounded-lg border border-destructive/40 text-destructive px-4 py-2 text-sm font-semibold hover:bg-destructive/10 disabled:opacity-60 transition-colors">
-                      {acting === sub.id ? "…" : "Reject"}
-                    </button>
-                  </div>
-                )}
               </div>
+
+              {/* Expanded details */}
+              {expanded === sub.id && (
+                <div className="border-t bg-muted/30 px-6 py-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+                    {sub.expectedVolume && (
+                      <div><p className="text-muted-foreground text-xs mb-0.5">Expected Volume</p><p className="font-medium">{sub.expectedVolume}</p></div>
+                    )}
+                    {sub.webhookUrl && (
+                      <div><p className="text-muted-foreground text-xs mb-0.5">Webhook Endpoint</p><p className="font-medium truncate text-xs font-mono">{sub.webhookUrl}</p></div>
+                    )}
+                    {sub.resolvedAt && (
+                      <div><p className="text-muted-foreground text-xs mb-0.5">Resolved</p><p className="font-medium">{new Date(sub.resolvedAt).toLocaleDateString()}</p></div>
+                    )}
+                  </div>
+                  <div className={`flex items-center gap-2 text-sm rounded-lg px-3 py-2 ${sub.tosAccepted ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300"}`}>
+                    <span>{sub.tosAccepted ? "✅" : "❌"}</span>
+                    <span>
+                      {sub.tosAccepted
+                        ? `Terms of Service accepted${sub.tosAcceptedAt ? ` on ${new Date(sub.tosAcceptedAt).toLocaleString()}` : ""}`
+                        : "Terms of Service not accepted"}
+                    </span>
+                  </div>
+                  {sub.status === "active" && sub.apiKey && (
+                    <div><p className="text-muted-foreground text-xs mb-0.5">API Key</p><p className="font-mono text-xs truncate">{sub.apiKey.slice(0, 24)}…</p></div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -22,12 +22,38 @@ interface Subscription {
   apiKey?: string;
   requestedAt: string;
   resolvedAt?: string;
+  companyName?: string;
+}
+
+interface RegistrationFields {
+  companyName: string;
+  dealerId: string;
+  useCase: string;
+  expectedVolume: string;
+  webhookUrl: string;
+  tosAccepted: boolean;
 }
 
 const PLANS: Plan[] = [
   { id: "basic", name: "Basic", approval: "auto", rateLimit: "100 req/min", monthlyQuota: "50,000 / month", sla: "Best-effort", description: "Get started immediately with auto-approval. Great for exploration and prototyping." },
-  { id: "pro", name: "Pro", approval: "manual", rateLimit: "1,000 req/min", monthlyQuota: "5,000,000 / month", sla: "99.9% uptime", highlighted: true, description: "Production-grade access with guaranteed uptime SLA. Recommended for most teams." },
+  { id: "pro", name: "Pro", approval: "manual", rateLimit: "15 req/min", monthlyQuota: "5,000,000 / month", sla: "99.9% uptime", highlighted: true, description: "Production-grade access with guaranteed uptime SLA. Recommended for most dealer integrations." },
   { id: "enterprise", name: "Enterprise", approval: "manual", rateLimit: "Unlimited", monthlyQuota: "Unlimited", sla: "99.99% uptime", description: "Maximum scale with dedicated support and custom rate limits." },
+];
+
+const USE_CASES = [
+  "Inventory sync",
+  "Order management",
+  "Dealer pricing & quoting",
+  "Reporting & analytics",
+  "Customer portal integration",
+  "Other",
+];
+
+const VOLUME_OPTIONS = [
+  "< 10,000 / month",
+  "10,000 – 100,000 / month",
+  "100,000 – 1,000,000 / month",
+  "> 1,000,000 / month",
 ];
 
 function CopyButton({ text }: { text: string }) {
@@ -51,10 +77,173 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
   );
 }
 
+function RequestAccessModal({
+  plan,
+  onSubmit,
+  onCancel,
+  submitting,
+}: {
+  plan: Plan;
+  onSubmit: (fields: RegistrationFields) => void;
+  onCancel: () => void;
+  submitting: boolean;
+}) {
+  const [fields, setFields] = useState<RegistrationFields>({
+    companyName: "",
+    dealerId: "",
+    useCase: "",
+    expectedVolume: "",
+    webhookUrl: "",
+    tosAccepted: false,
+  });
+
+  const valid =
+    fields.companyName.trim() &&
+    fields.dealerId.trim() &&
+    fields.useCase &&
+    fields.expectedVolume &&
+    fields.tosAccepted;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-background rounded-xl border shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h2 className="text-xl font-bold mb-1">Request {plan.name} Access</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Please provide your dealership details. This information helps Forest River review and approve your API access request.
+          </p>
+
+          <div className="space-y-4">
+            {/* Company name */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Company Name <span className="text-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="ABC RV Dealership"
+                value={fields.companyName}
+                onChange={e => setFields(f => ({ ...f, companyName: e.target.value }))}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            {/* Dealer ID */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Forest River Dealer ID <span className="text-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="FR-1234"
+                value={fields.dealerId}
+                onChange={e => setFields(f => ({ ...f, dealerId: e.target.value }))}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Your existing Forest River dealer number</p>
+            </div>
+
+            {/* Primary use case */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Primary Use Case <span className="text-destructive">*</span>
+              </label>
+              <select
+                value={fields.useCase}
+                onChange={e => setFields(f => ({ ...f, useCase: e.target.value }))}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Select a use case…</option>
+                {USE_CASES.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+
+            {/* Expected volume */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Expected Monthly API Volume <span className="text-destructive">*</span>
+              </label>
+              <select
+                value={fields.expectedVolume}
+                onChange={e => setFields(f => ({ ...f, expectedVolume: e.target.value }))}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Select volume…</option>
+                {VOLUME_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
+            {/* Webhook URL (optional) */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Webhook Endpoint URL <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+              </label>
+              <input
+                type="url"
+                placeholder="https://yoursystem.com/fr-webhook"
+                value={fields.webhookUrl}
+                onChange={e => setFields(f => ({ ...f, webhookUrl: e.target.value }))}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Register an endpoint to receive signed event notifications from Forest River</p>
+            </div>
+
+            {/* Terms of Service */}
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="tos"
+                  checked={fields.tosAccepted}
+                  onChange={e => setFields(f => ({ ...f, tosAccepted: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer"
+                />
+                <label htmlFor="tos" className="text-sm cursor-pointer">
+                  I agree to the{" "}
+                  <a href="/authentication" className="text-primary underline hover:no-underline">
+                    Forest River API Terms of Service
+                  </a>{" "}
+                  and acknowledge that API access is subject to Forest River's review and approval process.
+                  By submitting this request, I confirm that my dealership is an authorized Forest River dealer.
+                  <span className="text-destructive ml-1">*</span>
+                </label>
+              </div>
+            </div>
+
+            {!valid && (
+              <p className="text-xs text-muted-foreground">
+                <span className="text-destructive">*</span> Required fields
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={onCancel}
+              disabled={submitting}
+              className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onSubmit(fields)}
+              disabled={!valid || submitting}
+              className="flex-1 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
+            >
+              {submitting ? "Submitting…" : `Request ${plan.name} Access`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" | "subscriptions" }) {
   const [view, setView] = useState<"plans" | "subscriptions">(defaultView);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [requesting, setRequesting] = useState<string | null>(null);
+  const [modalPlan, setModalPlan] = useState<Plan | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
   const auth = useAuth();
   const { authentication } = useZudoku();
@@ -97,43 +286,74 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
     return () => clearInterval(interval);
   }, [subscriptions, fetchSubscriptions]);
 
-  const getSubscriptionForPlan = (planId: string) => subscriptions.find(s => s.planId === planId && s.status !== "rejected");
+  const getSubscriptionForPlan = (planId: string) =>
+    subscriptions.find(s => s.planId === planId && s.status !== "rejected");
 
-  const requestAccess = async (plan: Plan) => {
+  const handleRequestAccess = (plan: Plan) => {
     if (!auth.isAuthenticated) { auth.login(); return; }
-    if (requesting || getSubscriptionForPlan(plan.id)) return;
-    setRequesting(plan.id);
+    if (getSubscriptionForPlan(plan.id)) return;
+    setModalPlan(plan);
+  };
+
+  const handleSubmit = async (fields: RegistrationFields) => {
+    if (!modalPlan) return;
+    setSubmitting(true);
     try {
       const res = await authFetch(`${GATEWAY_URL}/subscriptions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: plan.id, planName: plan.name }),
+        body: JSON.stringify({
+          planId: modalPlan.id,
+          planName: modalPlan.name,
+          companyName: fields.companyName,
+          dealerId: fields.dealerId,
+          useCase: fields.useCase,
+          expectedVolume: fields.expectedVolume,
+          webhookUrl: fields.webhookUrl,
+          tosAccepted: fields.tosAccepted,
+          tosAcceptedAt: new Date().toISOString(),
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       const sub: Subscription = await res.json();
       setSubscriptions(prev => [...prev, sub]);
-      if (sub.status === "active") showToast(`✅ API key provisioned for ${plan.name} plan!`, "success");
-      else showToast(`⏳ Request submitted for ${plan.name}. Awaiting admin approval.`, "info");
-    } catch (err) { showToast("Failed to submit request. Please try again.", "error"); console.error(err); }
-    finally { setRequesting(null); }
+      setModalPlan(null);
+      if (sub.status === "active") showToast(`✅ API key provisioned for ${modalPlan.name} plan!`, "success");
+      else showToast(`⏳ Request submitted for ${modalPlan.name}. Awaiting admin approval.`, "info");
+    } catch (err) {
+      showToast("Failed to submit request. Please try again.", "error");
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  const revoke = (sub: Subscription) => { setSubscriptions(prev => prev.filter(s => s.id !== sub.id)); showToast("Subscription revoked.", "info"); };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {modalPlan && (
+        <RequestAccessModal
+          plan={modalPlan}
+          onSubmit={handleSubmit}
+          onCancel={() => setModalPlan(null)}
+          submitting={submitting}
+        />
+      )}
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">API Access</h1>
         <p className="text-muted-foreground">Choose a plan and get your API key to start building with the Forest River API.</p>
       </div>
+
       <div className="flex gap-1 mb-8 rounded-lg border p-1 w-fit bg-muted">
         {(["plans", "subscriptions"] as const).map(tab => (
           <button key={tab} onClick={() => setView(tab)}
             className={`rounded-md px-5 py-1.5 text-sm font-medium transition-colors ${view === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
             {tab === "plans" ? "Plans" : "My Subscriptions"}
             {tab === "subscriptions" && subscriptions.filter(s => s.status !== "rejected").length > 0 && (
-              <span className="ml-2 rounded-full bg-primary text-primary-foreground text-xs px-1.5 py-0.5">{subscriptions.filter(s => s.status !== "rejected").length}</span>
+              <span className="ml-2 rounded-full bg-primary text-primary-foreground text-xs px-1.5 py-0.5">
+                {subscriptions.filter(s => s.status !== "rejected").length}
+              </span>
             )}
           </button>
         ))}
@@ -143,29 +363,51 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {PLANS.map(plan => {
             const sub = getSubscriptionForPlan(plan.id);
-            const isRequesting = requesting === plan.id;
             return (
               <div key={plan.id} className={`relative flex flex-col rounded-xl border p-6 ${plan.highlighted ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-border bg-card"}`}>
-                {plan.highlighted && <div className="absolute -top-3 left-1/2 -translate-x-1/2"><span className="rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-primary-foreground">Recommended</span></div>}
+                {plan.highlighted && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-primary-foreground">Recommended</span>
+                  </div>
+                )}
                 <div className="mb-4">
                   <h2 className="text-xl font-bold">{plan.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
                 </div>
                 <dl className="mb-6 space-y-2 text-sm">
-                  {[["Rate limit", plan.rateLimit], ["Monthly quota", plan.monthlyQuota], ["SLA", plan.sla], ["Approval", plan.approval === "auto" ? "Instant" : "Admin review"]].map(([label, value]) => (
-                    <div key={label} className="flex justify-between"><dt className="text-muted-foreground">{label}</dt><dd className="font-medium">{value}</dd></div>
+                  {[
+                    ["Rate limit", plan.rateLimit],
+                    ["Monthly quota", plan.monthlyQuota],
+                    ["SLA", plan.sla],
+                    ["Approval", plan.approval === "auto" ? "Instant" : "Admin review"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="font-medium">{value}</dd>
+                    </div>
                   ))}
                 </dl>
                 <div className="mt-auto">
-                  {!sub && <button onClick={() => requestAccess(plan)} disabled={!!isRequesting}
-                    className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${plan.highlighted ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border bg-background hover:bg-muted"}`}>
-                    {isRequesting ? "Requesting…" : !auth.isAuthenticated ? "Sign in to request access" : "Request access"}
-                  </button>}
-                  {sub?.status === "pending" && <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-400 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-800 dark:border-yellow-600 dark:bg-yellow-950 dark:text-yellow-300"><span className="animate-pulse">⏳</span> Pending admin approval…</div>}
-                  {sub?.status === "active" && <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
-                    <p className="mb-1 text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted</p>
-                    <div className="flex items-center"><code className="flex-1 truncate rounded text-xs font-mono text-green-900 dark:text-green-200">{sub.apiKey}</code>{sub.apiKey && <CopyButton text={sub.apiKey} />}</div>
-                  </div>}
+                  {!sub && (
+                    <button onClick={() => handleRequestAccess(plan)}
+                      className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${plan.highlighted ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border bg-background hover:bg-muted"}`}>
+                      {!auth.isAuthenticated ? "Sign in to request access" : "Request access"}
+                    </button>
+                  )}
+                  {sub?.status === "pending" && (
+                    <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-400 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-800 dark:border-yellow-600 dark:bg-yellow-950 dark:text-yellow-300">
+                      <span className="animate-pulse">⏳</span> Pending admin approval…
+                    </div>
+                  )}
+                  {sub?.status === "active" && (
+                    <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
+                      <p className="mb-1 text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted</p>
+                      <div className="flex items-center">
+                        <code className="flex-1 truncate rounded text-xs font-mono text-green-900 dark:text-green-200">{sub.apiKey}</code>
+                        {sub.apiKey && <CopyButton text={sub.apiKey} />}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -195,17 +437,34 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold text-lg">{sub.planName}</h3>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"}`}>{sub.status === "active" ? "Active" : "Pending"}</span>
+                          {sub.companyName && <span className="text-muted-foreground text-sm">— {sub.companyName}</span>}
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"}`}>
+                            {sub.status === "active" ? "Active" : "Pending"}
+                          </span>
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
-                          {plan && <><div><dt className="text-muted-foreground">Rate limit</dt><dd className="font-medium">{plan.rateLimit}</dd></div><div><dt className="text-muted-foreground">Monthly quota</dt><dd className="font-medium">{plan.monthlyQuota}</dd></div><div><dt className="text-muted-foreground">SLA</dt><dd className="font-medium">{plan.sla}</dd></div></>}
+                          {plan && <>
+                            <div><dt className="text-muted-foreground">Rate limit</dt><dd className="font-medium">{plan.rateLimit}</dd></div>
+                            <div><dt className="text-muted-foreground">Monthly quota</dt><dd className="font-medium">{plan.monthlyQuota}</dd></div>
+                            <div><dt className="text-muted-foreground">SLA</dt><dd className="font-medium">{plan.sla}</dd></div>
+                          </>}
                           <div><dt className="text-muted-foreground">Requested</dt><dd className="font-medium">{new Date(sub.requestedAt).toLocaleDateString()}</dd></div>
-                          {sub.resolvedAt && <div><dt className="text-muted-foreground">Approved</dt><dd className="font-medium">{new Date(sub.resolvedAt).toLocaleDateString()}</dd></div>}
                         </dl>
-                        {sub.status === "active" && sub.apiKey && <div className="mt-4 rounded-lg border bg-muted/50 p-3"><p className="mb-1 text-xs font-medium text-muted-foreground">API Key</p><div className="flex items-center"><code className="flex-1 truncate text-sm font-mono">{sub.apiKey}</code><CopyButton text={sub.apiKey} /></div></div>}
-                        {sub.status === "pending" && <div className="mt-4 flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400"><span className="animate-pulse">⏳</span> Waiting for admin approval — checking every 5 seconds…</div>}
+                        {sub.status === "active" && sub.apiKey && (
+                          <div className="mt-4 rounded-lg border bg-muted/50 p-3">
+                            <p className="mb-1 text-xs font-medium text-muted-foreground">API Key</p>
+                            <div className="flex items-center">
+                              <code className="flex-1 truncate text-sm font-mono">{sub.apiKey}</code>
+                              <CopyButton text={sub.apiKey} />
+                            </div>
+                          </div>
+                        )}
+                        {sub.status === "pending" && (
+                          <div className="mt-4 flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
+                            <span className="animate-pulse">⏳</span> Waiting for admin approval — checking every 5 seconds…
+                          </div>
+                        )}
                       </div>
-                      <button onClick={() => revoke(sub)} className="shrink-0 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">Revoke</button>
                     </div>
                   </div>
                 );
