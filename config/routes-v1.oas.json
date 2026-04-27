@@ -1,0 +1,129 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Forest River API (v1)",
+    "version": "1.0.0",
+    "description": "⚠️ **This version is deprecated.** Please migrate to v2 before **July 1, 2026**.\n\nSee the [v2 migration guide](/api) for details on breaking changes."
+  },
+  "paths": {
+    "/v1/vehicles": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "get": {
+        "summary": "List vehicles",
+        "description": "**Deprecated.** Returns Forest River vehicle inventory.\n\n**Breaking changes in v2:**\n- `dealerCode` (short string) replaced by `dealerId` (UUID) following dealer system migration\n- New `category` field added (Camping, Work & Play, Marine, Specialty)\n\nMigrate to `/v2/vehicles` before the sunset date.",
+        "operationId": "v1-get-vehicles",
+        "tags": [
+          "Vehicles"
+        ],
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "v1-sunset-inbound",
+              "v1-brownout-inbound",
+              "api-key-inbound",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ],
+            "outbound": []
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vehicle list (v1 schema)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "make": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "year": {
+                        "type": "integer"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "msrp": {
+                        "type": "number"
+                      },
+                      "dealerCode": {
+                        "type": "string",
+                        "deprecated": true,
+                        "description": "⚠️ Deprecated — replaced by `dealerId` (UUID) in v2."
+                      },
+                      "available": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "vehicle-list": {
+                    "summary": "Sample v1 vehicle inventory",
+                    "value": [
+                      {
+                        "id": "veh-001",
+                        "make": "Forest River",
+                        "model": "Rockwood Ultra Lite 2892RB",
+                        "year": 2025,
+                        "type": "travel-trailer",
+                        "msrp": 42999,
+                        "dealerCode": "FR-1234",
+                        "available": true
+                      },
+                      {
+                        "id": "veh-002",
+                        "make": "Forest River",
+                        "model": "Cherokee Wolf Pack 365SUITE16",
+                        "year": 2025,
+                        "type": "fifth-wheel",
+                        "msrp": 89995,
+                        "dealerCode": "FR-5678",
+                        "available": true
+                      },
+                      {
+                        "id": "veh-003",
+                        "make": "Forest River",
+                        "model": "Work and Play 25WP",
+                        "year": 2024,
+                        "type": "toy-hauler",
+                        "msrp": 38500,
+                        "dealerCode": "FR-9012",
+                        "available": false
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — invalid or missing API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    }
+  }
+}

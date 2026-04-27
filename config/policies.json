@@ -31,6 +31,77 @@
         "export": "default",
         "module": "$import(./modules/admin-auth)"
       }
+    },
+    {
+      "name": "plan-rate-limit-inbound",
+      "policyType": "rate-limit-inbound",
+      "handler": {
+        "export": "RateLimitInboundPolicy",
+        "module": "$import(@zuplo/runtime)",
+        "options": {
+          "rateLimitBy": "function",
+          "requestsAllowed": 100,
+          "timeWindowMinutes": 1,
+          "identifier": {
+            "export": "rateLimit",
+            "module": "$import(./modules/rate-limit)"
+          }
+        }
+      }
+    },
+    {
+      "name": "mock-api-inbound",
+      "policyType": "mock-api-inbound",
+      "handler": {
+        "export": "MockApiInboundPolicy",
+        "module": "$import(@zuplo/runtime)",
+        "options": {
+          "contentType": "application/json",
+          "random": false
+        }
+      }
+    },
+    {
+      "name": "v1-deprecation-outbound",
+      "policyType": "http-deprecation-outbound",
+      "handler": {
+        "export": "HttpDeprecationOutboundPolicy",
+        "module": "$import(@zuplo/runtime)",
+        "options": {
+          "deprecation": "2026-01-15T00:00:00Z",
+          "sunset": "2026-07-01T23:59:59Z",
+          "link": "https://forest-river-demo-main-fb06bf1.zuplo.site/api"
+        }
+      }
+    },
+    {
+      "name": "v1-brownout-inbound",
+      "policyType": "brownout-inbound",
+      "handler": {
+        "export": "BrownoutInboundPolicy",
+        "module": "$import(@zuplo/runtime)",
+        "options": {
+          "cronSchedule": [
+            "0 * * * *",
+            "15 * * * *",
+            "30 * * * *"
+          ],
+          "problem": {
+            "type": "https://httpproblems.com/http-status/503",
+            "title": "Scheduled Brownout \u2014 API v1 Retiring May 30, 2026",
+            "detail": "Forest River API v1 is being retired on May 30, 2026. This brownout is a scheduled reminder to migrate to v2. See https://forest-river-demo-main-fb06bf1.zuplo.site/api for the migration guide.",
+            "status": 503
+          }
+        }
+      }
+    },
+    {
+      "name": "v1-sunset-inbound",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/v1-sunset)"
+      }
     }
   ],
   "corsPolicies": [
@@ -40,8 +111,17 @@
         "https://forest-river-demo-main-fb06bf1.zuplo.site",
         "https://forest-river-demo-main-5ef061c.zuplo.site"
       ],
-      "allowedMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      "allowedHeaders": ["Authorization", "Content-Type"],
+      "allowedMethods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "OPTIONS"
+      ],
+      "allowedHeaders": [
+        "Authorization",
+        "Content-Type"
+      ],
       "allowCredentials": true,
       "maxAge": 86400
     }

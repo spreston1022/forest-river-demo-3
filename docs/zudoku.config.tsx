@@ -6,11 +6,84 @@ import { AdminPage } from "./AdminPage";
 const config: ZudokuConfig = {
   site: {
     title: "Forest River Developer Portal",
+    logo: {
+      src: {
+        light: "https://www.forestriverinc.com/images/logo-reversed.png",
+        dark: "https://www.forestriverinc.com/images/logo-reversed.png",
+      },
+      width: "160px",
+    },
     banner: {
-      message: "🚧 Demo environment — not connected to production systems.",
+      message: "⚠️ API v1 is being retired on May 30, 2026. Please migrate to v2. See the Migration Guide for details.",
       color: "caution",
       dismissible: true,
     },
+  },
+
+  metadata: {
+    favicon: "https://www.forestriverinc.com/images/favicon.png",
+    title: "Forest River Developer Portal",
+    description: "Developer documentation and API access for Forest River, Inc.",
+  },
+
+  theme: {
+    light: {
+      primary: "#026957",
+      primaryForeground: "#ffffff",
+      background: "#ffffff",
+      foreground: "#232323",
+      card: "#ffffff",
+      cardForeground: "#232323",
+      popover: "#ffffff",
+      popoverForeground: "#232323",
+      secondary: "#f0f7f5",
+      secondaryForeground: "#026957",
+      muted: "#f5f5f5",
+      mutedForeground: "#6c757d",
+      accent: "#f0f7f5",
+      accentForeground: "#026957",
+      destructive: "#dc3545",
+      destructiveForeground: "#ffffff",
+      border: "#e2e2e2",
+      input: "#e2e2e2",
+      ring: "#026957",
+      radius: "0rem",
+    },
+    dark: {
+      primary: "#02a17f",
+      primaryForeground: "#ffffff",
+      background: "#0f1a17",
+      foreground: "#f0f7f5",
+      card: "#1a2d28",
+      cardForeground: "#f0f7f5",
+      popover: "#1a2d28",
+      popoverForeground: "#f0f7f5",
+      secondary: "#1a2d28",
+      secondaryForeground: "#f0f7f5",
+      muted: "#1a2d28",
+      mutedForeground: "#94a3b8",
+      accent: "#1a2d28",
+      accentForeground: "#02a17f",
+      destructive: "#ef4444",
+      destructiveForeground: "#ffffff",
+      border: "#2a3d38",
+      input: "#2a3d38",
+      ring: "#02a17f",
+      radius: "0rem",
+    },
+    fonts: {
+      sans: "Montserrat",
+      mono: "JetBrains Mono",
+    },
+    customCss: `
+      header {
+        background-color: #026957 !important;
+        border-bottom: none !important;
+      }
+      header a, header button, header span {
+        color: #ffffff !important;
+      }
+    `,
   },
 
   authentication: {
@@ -20,11 +93,19 @@ const config: ZudokuConfig = {
     audience: "https://forest-river-demo",
   },
 
-  apis: {
-    type: "file",
-    input: "../config/routes.oas.json",
-    path: "/api",
-  },
+  // Multiple API versions — Zudoku renders a version dropdown automatically
+  apis: [
+    {
+      type: "file",
+      input: "../config/routes-v2.oas.json",
+      path: "/api",
+    },
+    {
+      type: "file",
+      input: "../config/routes-v1.oas.json",
+      path: "/api/v1",
+    },
+  ],
 
   docs: {
     files: "/pages/**/*.{md,mdx}",
@@ -32,7 +113,6 @@ const config: ZudokuConfig = {
 
   navigation: [
     {
-      // Serve introduction.md at root so / doesn't 404
       type: "doc",
       file: "introduction",
       path: "/",
@@ -47,6 +127,7 @@ const config: ZudokuConfig = {
         { type: "doc", file: "introduction", label: "Introduction" },
         { type: "doc", file: "quickstart", label: "Quick Start" },
         { type: "doc", file: "authentication", label: "Authentication" },
+        { type: "doc", file: "migration-guide", label: "Migration Guide", icon: "alert-triangle" },
       ],
     },
     {
