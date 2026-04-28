@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth, useZudoku } from "zudoku/hooks";
 
 const GATEWAY_URL = import.meta.env.ZUPLO_PUBLIC_SERVER_URL ?? "https://forest-river-demo-main-fb06bf1.zuplo.app";
+
+// Replace with your actual Turnstile sitekey from dash.cloudflare.com/turnstile
+// For testing use: 1x00000000000000000000AA (always passes)
+const TURNSTILE_SITEKEY = import.meta.env.ZUDOKU_PUBLIC_TURNSTILE_SITEKEY ?? "1x00000000000000000000AA";
 
 interface Plan {
   id: "basic" | "pro" | "enterprise";
@@ -40,21 +44,8 @@ const PLANS: Plan[] = [
   { id: "enterprise", name: "Enterprise", approval: "manual", rateLimit: "Unlimited", monthlyQuota: "Unlimited", sla: "99.99% uptime", description: "Maximum scale with dedicated support and custom rate limits." },
 ];
 
-const USE_CASES = [
-  "Inventory sync",
-  "Order management",
-  "Dealer pricing & quoting",
-  "Reporting & analytics",
-  "Customer portal integration",
-  "Other",
-];
-
-const VOLUME_OPTIONS = [
-  "< 10,000 / month",
-  "10,000 – 100,000 / month",
-  "100,000 – 1,000,000 / month",
-  "> 1,000,000 / month",
-];
+const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoting", "Reporting & analytics", "Customer portal integration", "Other"];
+const VOLUME_OPTIONS = ["< 10,000 / month", "10,000 – 100,000 / month", "100,000 – 1,000,000 / month", "> 1,000,000 / month"];
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -78,31 +69,88 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 }
 
 function RequestAccessModal({
-  plan,
-  onSubmit,
-  onCancel,
-  submitting,
+  plan, onSubmit, onCancel, submitting,
 }: {
   plan: Plan;
-  onSubmit: (fields: RegistrationFields) => void;
+  onSubmit: (fields: RegistrationFields, turnstileToken: string) => void;
   onCancel: () => void;
   submitting: boolean;
 }) {
   const [fields, setFields] = useState<RegistrationFields>({
-    companyName: "",
-    dealerId: "",
-    useCase: "",
-    expectedVolume: "",
-    webhookUrl: "",
-    tosAccepted: false,
+    companyName: "", dealerId: "", useCase: "", expectedVolume: "", webhookUrl: "", tosAccepted: false,
   });
+  const [turnstileToken, setTurnstileToken] = useState<string>("");
+  const [turnstileError, setTurnstileError] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  // Load Turnstile script and render widget
+  useEffect(() => {
+    // Load Turnstile script if not already loaded
+    if (!document.getElementById("cf-turnstile-script")) {
+      const script = document.createElement("script");
+      script.id = "cf-turnstile-script";
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+
+    // Render the widget once script is ready
+    const renderWidget = () => {
+      if (containerRef.current && (window as any).turnstile) {
+        widgetIdRef.current = (window as any).turnstile.render(containerRef.current, {
+          sitekey: TURNSTILE_SITEKEY,
+          theme: "light",
+          size: "invisible",
+          callback: (token: string) => {
+            setTurnstileToken(token);
+            setTurnstileError(false);
+          },
+          "error-callback": () => setTurnstileError(true),
+          "expired-callback": () => setTurnstileToken(""),
+        });
+      }
+    };
+
+    if ((window as any).turnstile) {
+      renderWidget();
+    } else {
+      // Wait for script to load
+      const interval = setInterval(() => {
+        if ((window as any).turnstile) {
+          clearInterval(interval);
+          renderWidget();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+
+    return () => {
+      if (widgetIdRef.current && (window as any).turnstile) {
+        try { (window as any).turnstile.remove(widgetIdRef.current); } catch {}
+      }
+    };
+  }, []);
 
   const valid =
     fields.companyName.trim() &&
     fields.dealerId.trim() &&
     fields.useCase &&
     fields.expectedVolume &&
-    fields.tosAccepted;
+    fields.tosAccepted &&
+    turnstileToken;
+
+  const handleSubmit = () => {
+    if (!turnstileToken) {
+      // Trigger Turnstile challenge explicitly if token not yet issued
+      if (widgetIdRef.current && (window as any).turnstile) {
+        (window as any).turnstile.execute(widgetIdRef.current);
+      }
+      return;
+    }
+    onSubmit(fields, turnstileToken);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -114,122 +162,88 @@ function RequestAccessModal({
           </p>
 
           <div className="space-y-4">
-            {/* Company name */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Company Name <span className="text-destructive">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="ABC RV Dealership"
-                value={fields.companyName}
+              <label className="block text-sm font-medium mb-1">Company Name <span className="text-destructive">*</span></label>
+              <input type="text" placeholder="ABC RV Dealership" value={fields.companyName}
                 onChange={e => setFields(f => ({ ...f, companyName: e.target.value }))}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
 
-            {/* Dealer ID */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Forest River Dealer ID <span className="text-destructive">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="FR-1234"
-                value={fields.dealerId}
+              <label className="block text-sm font-medium mb-1">Forest River Dealer ID <span className="text-destructive">*</span></label>
+              <input type="text" placeholder="FR-1234" value={fields.dealerId}
                 onChange={e => setFields(f => ({ ...f, dealerId: e.target.value }))}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               <p className="mt-1 text-xs text-muted-foreground">Your existing Forest River dealer number</p>
             </div>
 
-            {/* Primary use case */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Primary Use Case <span className="text-destructive">*</span>
-              </label>
-              <select
-                value={fields.useCase}
-                onChange={e => setFields(f => ({ ...f, useCase: e.target.value }))}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
+              <label className="block text-sm font-medium mb-1">Primary Use Case <span className="text-destructive">*</span></label>
+              <select value={fields.useCase} onChange={e => setFields(f => ({ ...f, useCase: e.target.value }))}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="">Select a use case…</option>
                 {USE_CASES.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
 
-            {/* Expected volume */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Expected Monthly API Volume <span className="text-destructive">*</span>
-              </label>
-              <select
-                value={fields.expectedVolume}
-                onChange={e => setFields(f => ({ ...f, expectedVolume: e.target.value }))}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
+              <label className="block text-sm font-medium mb-1">Expected Monthly API Volume <span className="text-destructive">*</span></label>
+              <select value={fields.expectedVolume} onChange={e => setFields(f => ({ ...f, expectedVolume: e.target.value }))}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="">Select volume…</option>
                 {VOLUME_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
 
-            {/* Webhook URL (optional) */}
             <div>
               <label className="block text-sm font-medium mb-1">
                 Webhook Endpoint URL <span className="text-muted-foreground text-xs font-normal">(optional)</span>
               </label>
-              <input
-                type="url"
-                placeholder="https://yoursystem.com/fr-webhook"
-                value={fields.webhookUrl}
+              <input type="url" placeholder="https://yoursystem.com/fr-webhook" value={fields.webhookUrl}
                 onChange={e => setFields(f => ({ ...f, webhookUrl: e.target.value }))}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               <p className="mt-1 text-xs text-muted-foreground">Register an endpoint to receive signed event notifications from Forest River</p>
             </div>
 
-            {/* Terms of Service */}
             <div className="rounded-lg border bg-muted/30 p-4">
               <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="tos"
-                  checked={fields.tosAccepted}
+                <input type="checkbox" id="tos" checked={fields.tosAccepted}
                   onChange={e => setFields(f => ({ ...f, tosAccepted: e.target.checked }))}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer"
-                />
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary cursor-pointer" />
                 <label htmlFor="tos" className="text-sm cursor-pointer">
                   I agree to the{" "}
-                  <a href="/authentication" className="text-primary underline hover:no-underline">
-                    Forest River API Terms of Service
-                  </a>{" "}
-                  and acknowledge that API access is subject to Forest River's review and approval process.
+                  <a href="/authentication" className="text-primary underline hover:no-underline">Forest River API Terms of Service</a>
+                  {" "}and acknowledge that API access is subject to Forest River's review and approval process.
                   By submitting this request, I confirm that my dealership is an authorized Forest River dealer.
                   <span className="text-destructive ml-1">*</span>
                 </label>
               </div>
             </div>
 
-            {!valid && (
-              <p className="text-xs text-muted-foreground">
-                <span className="text-destructive">*</span> Required fields
-              </p>
+            {/* Invisible Turnstile widget container */}
+            <div ref={containerRef} />
+
+            {turnstileError && (
+              <p className="text-xs text-destructive">Bot protection challenge failed. Please refresh the page and try again.</p>
             )}
+
+            {/* Powered by Cloudflare badge */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <svg className="w-3 h-3" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M128 0C57.3 0 0 57.3 0 128s57.3 128 128 128 128-57.3 128-128S198.7 0 128 0z" fill="#F6821F"/>
+              </svg>
+              Protected by Cloudflare Turnstile
+            </div>
           </div>
 
           <div className="flex gap-3 mt-6">
-            <button
-              onClick={onCancel}
-              disabled={submitting}
-              className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-60"
-            >
+            <button onClick={onCancel} disabled={submitting}
+              className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-60">
               Cancel
             </button>
-            <button
-              onClick={() => onSubmit(fields)}
-              disabled={!valid || submitting}
-              className="flex-1 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
-            >
+            <button onClick={handleSubmit}
+              disabled={!fields.companyName.trim() || !fields.dealerId.trim() || !fields.useCase || !fields.expectedVolume || !fields.tosAccepted || submitting}
+              className="flex-1 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60">
               {submitting ? "Submitting…" : `Request ${plan.name} Access`}
             </button>
           </div>
@@ -295,7 +309,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
     setModalPlan(plan);
   };
 
-  const handleSubmit = async (fields: RegistrationFields) => {
+  const handleSubmit = async (fields: RegistrationFields, turnstileToken: string) => {
     if (!modalPlan) return;
     setSubmitting(true);
     try {
@@ -303,15 +317,12 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          planId: modalPlan.id,
-          planName: modalPlan.name,
-          companyName: fields.companyName,
-          dealerId: fields.dealerId,
-          useCase: fields.useCase,
-          expectedVolume: fields.expectedVolume,
+          planId: modalPlan.id, planName: modalPlan.name,
+          companyName: fields.companyName, dealerId: fields.dealerId,
+          useCase: fields.useCase, expectedVolume: fields.expectedVolume,
           webhookUrl: fields.webhookUrl,
-          tosAccepted: fields.tosAccepted,
-          tosAcceptedAt: new Date().toISOString(),
+          tosAccepted: fields.tosAccepted, tosAcceptedAt: new Date().toISOString(),
+          turnstileToken,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -323,21 +334,14 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
     } catch (err) {
       showToast("Failed to submit request. Please try again.", "error");
       console.error(err);
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       {modalPlan && (
-        <RequestAccessModal
-          plan={modalPlan}
-          onSubmit={handleSubmit}
-          onCancel={() => setModalPlan(null)}
-          submitting={submitting}
-        />
+        <RequestAccessModal plan={modalPlan} onSubmit={handleSubmit} onCancel={() => setModalPlan(null)} submitting={submitting} />
       )}
 
       <div className="mb-8">
@@ -375,12 +379,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                   <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
                 </div>
                 <dl className="mb-6 space-y-2 text-sm">
-                  {[
-                    ["Rate limit", plan.rateLimit],
-                    ["Monthly quota", plan.monthlyQuota],
-                    ["SLA", plan.sla],
-                    ["Approval", plan.approval === "auto" ? "Instant" : "Admin review"],
-                  ].map(([label, value]) => (
+                  {[["Rate limit", plan.rateLimit], ["Monthly quota", plan.monthlyQuota], ["SLA", plan.sla], ["Approval", plan.approval === "auto" ? "Instant" : "Admin review"]].map(([label, value]) => (
                     <div key={label} className="flex justify-between">
                       <dt className="text-muted-foreground">{label}</dt>
                       <dd className="font-medium">{value}</dd>
