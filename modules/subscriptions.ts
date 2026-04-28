@@ -15,6 +15,152 @@ const BASE = `https://dev.zuplo.com/v1/accounts/${ZUPLO_ACCOUNT}/key-buckets`;
 const AUTH0_DOMAIN = "dev-l3ayzqncrfw3ta50.us.auth0.com";
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
+// ─── Email notifications via Resend ──────────────────────────────────────────
+
+async function sendApprovalEmail(
+  toEmail: string,
+  companyName: string,
+  planName: string,
+  apiKey: string,
+  context: ZuploContext
+): Promise<void> {
+  const resendKey = environment.RESEND_API_KEY;
+  if (!resendKey) {
+    context.log.warn("RESEND_API_KEY not set — skipping approval email");
+    return;
+  }
+
+  const portalUrl = "https://forest-river-demo-main-fb06bf1.zuplo.site";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #232323;">
+      <div style="background-color: #026957; padding: 24px; margin-bottom: 24px;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Forest River Developer Portal</h1>
+      </div>
+      
+      <h2 style="color: #026957;">Your API Access Has Been Approved</h2>
+      
+      <p>Hi ${companyName},</p>
+      
+      <p>Great news! Your request for <strong>${planName} Plan</strong> access to the Forest River API has been approved.</p>
+      
+      <div style="background-color: #f0f7f5; border-left: 4px solid #026957; padding: 16px; margin: 24px 0;">
+        <p style="margin: 0 0 8px 0; font-size: 12px; color: #666666; text-transform: uppercase; letter-spacing: 0.05em;">Your API Key</p>
+        <code style="font-family: monospace; font-size: 14px; color: #026957; word-break: break-all;">${apiKey}</code>
+      </div>
+      
+      <p>Keep this key secure — treat it like a password. You can view and manage your subscriptions in the developer portal.</p>
+      
+      <div style="margin: 24px 0;">
+        <h3 style="color: #026957;">Getting Started</h3>
+        <p>Include your API key in the <code>Authorization</code> header of every request:</p>
+        <div style="background-color: #f5f5f5; padding: 12px; font-family: monospace; font-size: 13px;">
+          Authorization: Bearer ${apiKey}
+        </div>
+      </div>
+      
+      <p>
+        <a href="${portalUrl}/api" style="display: inline-block; background-color: #026957; color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: bold;">View API Reference</a>
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #e2e2e2; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #666666;">
+        If you have questions, visit the <a href="${portalUrl}" style="color: #026957;">Forest River Developer Portal</a> or contact your integration representative.
+      </p>
+    </body>
+    </html>
+  `;
+
+  const { ok } = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Forest River API <onboarding@resend.dev>",
+      to: [toEmail],
+      subject: `Your ${planName} API Access is Approved`,
+      html,
+    }),
+  });
+
+  if (ok) {
+    context.log.info(`Approval email sent to ${toEmail}`);
+  } else {
+    context.log.warn(`Failed to send approval email to ${toEmail}`);
+  }
+}
+
+async function sendRejectionEmail(
+  toEmail: string,
+  companyName: string,
+  planName: string,
+  context: ZuploContext
+): Promise<void> {
+  const resendKey = environment.RESEND_API_KEY;
+  if (!resendKey) {
+    context.log.warn("RESEND_API_KEY not set — skipping rejection email");
+    return;
+  }
+
+  const portalUrl = "https://forest-river-demo-main-fb06bf1.zuplo.site";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #232323;">
+      <div style="background-color: #026957; padding: 24px; margin-bottom: 24px;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Forest River Developer Portal</h1>
+      </div>
+      
+      <h2 style="color: #232323;">Update on Your API Access Request</h2>
+      
+      <p>Hi ${companyName},</p>
+      
+      <p>Thank you for your interest in the Forest River API. Unfortunately, your request for <strong>${planName} Plan</strong> access was not approved at this time.</p>
+      
+      <p>This may be due to incomplete information or eligibility requirements. If you believe this was an error or would like to discuss your request, please contact your Forest River integration representative.</p>
+      
+      <p>You are welcome to submit a new request through the developer portal.</p>
+      
+      <p>
+        <a href="${portalUrl}/subscribe" style="display: inline-block; background-color: #026957; color: #ffffff; padding: 12px 24px; text-decoration: none; font-weight: bold;">View Plans</a>
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #e2e2e2; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #666666;">
+        Forest River Developer Portal · <a href="${portalUrl}" style="color: #026957;">portal.forest-river-demo.us</a>
+      </p>
+    </body>
+    </html>
+  `;
+
+  const { ok } = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Forest River API <onboarding@resend.dev>",
+      to: [toEmail],
+      subject: `Update on Your ${planName} API Access Request`,
+      html,
+    }),
+  });
+
+  if (ok) {
+    context.log.info(`Rejection email sent to ${toEmail}`);
+  } else {
+    context.log.warn(`Failed to send rejection email to ${toEmail}`);
+  }
+}
+
+
+
 // ─── Turnstile verification ───────────────────────────────────────────────────
 
 async function verifyTurnstile(token: string, ip?: string): Promise<boolean> {
@@ -252,6 +398,16 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
     metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
 
+
+  // Send approval email in background — does not block response
+  context.waitUntil(sendApprovalEmail(
+    existing.metadata?.["email"] ?? "",
+    existing.metadata?.["companyName"] || existing.metadata?.["email"] || "Dealer",
+    existing.metadata?.["planName"] ?? "API",
+    keyData.key,
+    context
+  ));
+
   return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), {
     status: 200, headers: { "Content-Type": "application/json" },
   });
@@ -268,6 +424,15 @@ export async function adminRejectSubscription(request: ZuploRequest, context: Zu
     tags: { ...existing.tags, status: "rejected" },
     metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
+
+
+  // Send rejection email in background — does not block response
+  context.waitUntil(sendRejectionEmail(
+    existing.metadata?.["email"] ?? "",
+    existing.metadata?.["companyName"] || existing.metadata?.["email"] || "Dealer",
+    existing.metadata?.["planName"] ?? "API",
+    context
+  ));
 
   return new Response(JSON.stringify(consumerToSubscription(updated)), {
     status: 200, headers: { "Content-Type": "application/json" },
