@@ -1,8 +1,11 @@
 /**
  * modules/subscriptions.ts
  *
- * Uses Zuplo's API key consumer service as the data store.
- * Stores custom registration fields, ToS acceptance, and webhook URL in metadata.
+ * Includes Cloudflare Turnstile token validation on POST /subscriptions.
+ * Env vars required:
+ *   API_KEY            — Zuplo management API key
+ *   BUCKET_NAME        — Zuplo API key bucket name
+ *   TURNSTILE_SECRET   — Cloudflare Turnstile secret key
  */
 
 import { ZuploContext, ZuploRequest, environment } from "@zuplo/runtime";
@@ -10,6 +13,38 @@ import { ZuploContext, ZuploRequest, environment } from "@zuplo/runtime";
 const ZUPLO_ACCOUNT = "lavender-outstanding-bear";
 const BASE = `https://dev.zuplo.com/v1/accounts/${ZUPLO_ACCOUNT}/key-buckets`;
 const AUTH0_DOMAIN = "dev-l3ayzqncrfw3ta50.us.auth0.com";
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+// ─── Turnstile verification ───────────────────────────────────────────────────
+
+async function verifyTurnstile(token: string, ip?: string): Promise<boolean> {
+  const secret = environment.TURNSTILE_SECRET;
+
+  // If no secret configured, skip in dev (log a warning)
+  if (!secret) {
+    console.warn("TURNSTILE_SECRET not set — skipping bot protection check");
+    return true;
+  }
+
+  try {
+    const res = await fetch(TURNSTILE_VERIFY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret,
+        response: token,
+        ...(ip ? { remoteip: ip } : {}),
+      }),
+    });
+
+    const data = await res.json() as { success: boolean; "error-codes"?: string[] };
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Auth0 userinfo helper ────────────────────────────────────────────────────
 
 async function getUserEmail(request: ZuploRequest): Promise<string> {
   try {
@@ -23,6 +58,8 @@ async function getUserEmail(request: ZuploRequest): Promise<string> {
     return profile.email ?? "";
   } catch { return ""; }
 }
+
+// ─── Zuplo management API helpers ────────────────────────────────────────────
 
 function zuploHeaders() {
   return { Authorization: `Bearer ${environment.API_KEY}`, "Content-Type": "application/json" };
@@ -52,10 +89,10 @@ async function zuploPatch(path: string, body: unknown) {
   return res.json();
 }
 
+// ─── Consumer helpers ─────────────────────────────────────────────────────────
+
 interface ZuploConsumer {
-  id: string;
-  name: string;
-  description?: string;
+  id: string; name: string; description?: string;
   tags?: Record<string, string>;
   metadata?: Record<string, string>;
   apiKeys?: { id: string; key?: string }[];
@@ -95,19 +132,37 @@ function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
   };
 }
 
+// ─── Route handlers ───────────────────────────────────────────────────────────
+
 /** POST /subscriptions */
 export async function createSubscription(request: ZuploRequest, context: ZuploContext) {
-  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  if (!request.user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
 
-  const userId = request.user.sub!;
-  const userEmail = await getUserEmail(request);
   const body = await request.json() as {
     planId: string; planName: string;
     companyName?: string; dealerId?: string; useCase?: string;
     expectedVolume?: string; webhookUrl?: string;
     tosAccepted?: boolean; tosAcceptedAt?: string;
+    turnstileToken?: string;
   };
 
+  // ── Validate Turnstile token before doing anything else ──
+  if (body.turnstileToken) {
+    const ip = request.headers.get("CF-Connecting-IP") ?? undefined;
+    const valid = await verifyTurnstile(body.turnstileToken, ip);
+    if (!valid) {
+      context.log.warn("Turnstile verification failed", { ip });
+      return new Response(
+        JSON.stringify({ error: "Bot protection challenge failed. Please try again." }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  const userId = request.user.sub!;
+  const userEmail = await getUserEmail(request);
   const consumerName = subToConsumerName(userId, body.planId);
 
   // Check if consumer already exists
@@ -117,7 +172,7 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     return new Response(JSON.stringify(consumerToSubscription(existing, apiKey)), {
       status: 200, headers: { "Content-Type": "application/json" },
     });
-  } catch { /* Consumer doesn't exist yet */ }
+  } catch { /* Consumer doesn't exist yet — create it */ }
 
   const isBasic = body.planId === "basic";
 
@@ -126,8 +181,7 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     description: `${body.companyName || userEmail} — ${body.planName} plan`,
     tags: { plan: body.planId, status: isBasic ? "active" : "pending" },
     metadata: {
-      userId,
-      email: userEmail,
+      userId, email: userEmail,
       planName: body.planName,
       companyName: body.companyName ?? "",
       dealerId: body.dealerId ?? "",
@@ -217,5 +271,35 @@ export async function adminRejectSubscription(request: ZuploRequest, context: Zu
 
   return new Response(JSON.stringify(consumerToSubscription(updated)), {
     status: 200, headers: { "Content-Type": "application/json" },
+  });
+}
+
+/** POST /admin/subscriptions/:id/move — move consumer to a different plan group */
+export async function adminMoveSubscription(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
+
+  const consumerName = request.params.id;
+  const body = await request.json() as { planId: string; planName?: string };
+  const { planId, planName } = body;
+
+  const existing = await getConsumerWithKey(consumerName);
+
+  // Update the plan tag — this changes the rate limit group immediately
+  const updated = await zuploPatch(`/consumers/${consumerName}`, {
+    tags: { ...existing.tags, plan: planId },
+    metadata: {
+      ...existing.metadata,
+      planName: planName ?? planId,
+      movedAt: new Date().toISOString(),
+    },
+  }) as ZuploConsumer;
+
+  context.log.info(`Consumer ${consumerName} moved to plan group: ${planId}`);
+
+  return new Response(JSON.stringify(consumerToSubscription(updated)), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
   });
 }
