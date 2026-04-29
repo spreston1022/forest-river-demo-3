@@ -75,15 +75,7 @@ const config: ZudokuConfig = {
       sans: "Montserrat",
       mono: "JetBrains Mono",
     },
-    customCss: `
-      header {
-        background-color: #026957 !important;
-        border-bottom: none !important;
-      }
-      header a, header button, header span {
-        color: #ffffff !important;
-      }
-    `,
+    customCss: undefined,
   },
 
   authentication: {
