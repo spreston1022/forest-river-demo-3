@@ -337,6 +337,40 @@
           }
         }
       }
+    },
+    "/admin/email": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Admin \u2014 send email to consumers in a plan group",
+        "operationId": "admin-send-email",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminSendEmail",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Emails sent"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
     }
   }
 }
