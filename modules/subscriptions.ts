@@ -275,6 +275,8 @@ function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
     apiKey,
     requestedAt: c.metadata?.["requestedAt"] ?? new Date().toISOString(),
     resolvedAt: c.metadata?.["resolvedAt"],
+    portalMessage: c.metadata?.["portalMessage"] ?? "",
+    portalMessageType: (c.metadata?.["portalMessageType"] ?? "info") as "info" | "warning" | "success",
   };
 }
 
@@ -462,6 +464,77 @@ export async function adminMoveSubscription(request: ZuploRequest, context: Zupl
   }) as ZuploConsumer;
 
   context.log.info(`Consumer ${consumerName} moved to plan group: ${planId}`);
+
+  return new Response(JSON.stringify(consumerToSubscription(updated)), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/** POST /admin/announcements — publish a message to a plan group */
+export async function adminPublishAnnouncement(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
+
+  const body = await request.json() as {
+    message: string;
+    target: "all" | "basic" | "pro" | "enterprise";
+    type: "info" | "warning" | "success";
+  };
+
+  const consumers = await listConsumers();
+
+  // Filter to active consumers in the target group
+  const targets = consumers.filter(c => {
+    if (c.tags?.["status"] !== "active") return false;
+    if (body.target === "all") return true;
+    return c.tags?.["plan"] === body.target;
+  });
+
+  // Patch each consumer's metadata with the announcement
+  await Promise.all(targets.map(async (c) => {
+    try {
+      await zuploPatch(`/consumers/${c.name}`, {
+        tags: { ...c.tags },
+        metadata: {
+          ...c.metadata,
+          portalMessage: body.message,
+          portalMessageType: body.type,
+          portalMessageAt: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      context.log.error(`Failed to patch consumer ${c.name}`, err);
+    }
+  }));
+
+  return new Response(JSON.stringify({ updated: targets.length, target: body.target }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/** POST /admin/subscriptions/:id/announce — set/clear announcement on a single consumer */
+export async function adminAnnounceToConsumer(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
+
+  const consumerName = request.params.id;
+  const body = await request.json() as { message: string; type: string };
+
+  const existing = await getConsumerWithKey(consumerName);
+
+  const updated = await zuploPatch(`/consumers/${consumerName}`, {
+    tags: { ...existing.tags },
+    metadata: {
+      ...existing.metadata,
+      portalMessage: body.message,
+      portalMessageType: body.type,
+      portalMessageAt: body.message ? new Date().toISOString() : "",
+    },
+  }) as ZuploConsumer;
 
   return new Response(JSON.stringify(consumerToSubscription(updated)), {
     status: 200,

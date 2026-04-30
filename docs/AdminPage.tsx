@@ -10,6 +10,7 @@ interface Subscription {
   webhookUrl: string; tosAccepted: boolean; tosAcceptedAt: string;
   status: "pending" | "active" | "rejected";
   apiKey?: string; requestedAt: string; resolvedAt?: string;
+  portalMessage?: string;
 }
 
 const PLANS = [
@@ -18,7 +19,7 @@ const PLANS = [
   { id: "enterprise", name: "Enterprise", rateLimit: "Unlimited", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" },
 ];
 
-type TabType = "requests" | "groups";
+type TabType = "requests" | "groups" | "announcements";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -45,6 +46,12 @@ export function AdminPage() {
   const [filter, setFilter] = useState<"all" | "pending" | "active" | "rejected">("pending");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [movingPlan, setMovingPlan] = useState<Record<string, string>>({});
+
+  // Announcement state
+  const [announcementMessage, setAnnouncementMessage] = useState("");
+  const [announcementTarget, setAnnouncementTarget] = useState<"all" | "basic" | "pro" | "enterprise">("all");
+  const [announcementType, setAnnouncementType] = useState<"info" | "warning" | "success">("info");
+  const [publishing, setPublishing] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -110,6 +117,47 @@ export function AdminPage() {
     finally { setActing(null); }
   };
 
+  const publishAnnouncement = async () => {
+    if (!announcementMessage.trim()) return;
+    setPublishing(true);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/announcements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: announcementMessage,
+          target: announcementTarget,
+          type: announcementType,
+        }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        showToast(`✅ Announcement published to ${result.updated} consumer${result.updated !== 1 ? "s" : ""}`);
+        setAnnouncementMessage("");
+        await fetchAll(); // Refresh to show updated metadata
+      } else {
+        showToast(`Failed: ${await res.text()}`, "error");
+      }
+    } catch { showToast("Error publishing announcement", "error"); }
+    finally { setPublishing(false); }
+  };
+
+  const clearAnnouncements = async (target: string) => {
+    setPublishing(true);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/announcements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "", target, type: "info" }),
+      });
+      if (res.ok) {
+        showToast(`✅ Announcements cleared for ${target === "all" ? "all consumers" : target + " plan"}`);
+        await fetchAll();
+      }
+    } catch { showToast("Error clearing announcements", "error"); }
+    finally { setPublishing(false); }
+  };
+
   const isAdmin = (auth.profile as any)?.email === "sam@zuplo.com";
 
   if (!auth.isAuthenticated) return (
@@ -128,12 +176,13 @@ export function AdminPage() {
   const filtered = filter === "all" ? subscriptions : subscriptions.filter(s => s.status === filter);
   const pendingCount = subscriptions.filter(s => s.status === "pending").length;
   const activeCount = subscriptions.filter(s => s.status === "active").length;
-
-  // Group active consumers by plan
   const activeByPlan = PLANS.map(plan => ({
     ...plan,
     members: subscriptions.filter(s => s.status === "active" && s.planId === plan.id),
   }));
+
+  // Count consumers with active announcements
+  const withAnnouncements = subscriptions.filter(s => s.portalMessage).length;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -143,12 +192,12 @@ export function AdminPage() {
         </div>
       )}
 
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-1">Admin Dashboard</h1>
         <p className="text-muted-foreground text-sm">
-          {pendingCount > 0 && <span className="text-yellow-600 dark:text-yellow-400 font-medium">{pendingCount} pending approval · </span>}
+          {pendingCount > 0 && <span className="text-yellow-600 dark:text-yellow-400 font-medium">{pendingCount} pending · </span>}
           {activeCount} active consumers
+          {withAnnouncements > 0 && <span className="text-blue-600 dark:text-blue-400"> · {withAnnouncements} with active announcements</span>}
           {" · "}<button onClick={fetchAll} className="underline hover:no-underline text-primary">Refresh</button>
         </p>
       </div>
@@ -158,11 +207,12 @@ export function AdminPage() {
         {([
           { id: "requests", label: "Subscription Requests", badge: pendingCount > 0 ? pendingCount : null },
           { id: "groups", label: "Group Management", badge: null },
+          { id: "announcements", label: "Announcements", badge: withAnnouncements > 0 ? withAnnouncements : null },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`rounded-md px-5 py-1.5 text-sm font-medium transition-colors ${tab === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
             {t.label}
-            {t.badge && <span className="ml-2 rounded-full bg-yellow-500 text-white text-xs px-1.5 py-0.5">{t.badge}</span>}
+            {t.badge && <span className={`ml-2 rounded-full text-white text-xs px-1.5 py-0.5 ${t.id === "requests" ? "bg-yellow-500" : "bg-blue-500"}`}>{t.badge}</span>}
           </button>
         ))}
       </div>
@@ -195,6 +245,7 @@ export function AdminPage() {
                         <h3 className="font-semibold text-lg">{sub.companyName || sub.userEmail}</h3>
                         <StatusBadge status={sub.status} />
                         <PlanBadge planId={sub.planId} />
+                        {sub.portalMessage && <span className="rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 px-2 py-0.5 text-xs font-medium">📢 Has announcement</span>}
                       </div>
                       <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm sm:grid-cols-4">
                         <div><span className="text-muted-foreground">Email: </span><span className="font-medium">{sub.userEmail}</span></div>
@@ -227,15 +278,18 @@ export function AdminPage() {
                     <div className="border-t bg-muted/30 px-6 py-4 space-y-3">
                       <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
                         {sub.expectedVolume && <div><p className="text-muted-foreground text-xs mb-0.5">Expected Volume</p><p className="font-medium">{sub.expectedVolume}</p></div>}
-                        {sub.webhookUrl && <div><p className="text-muted-foreground text-xs mb-0.5">Webhook Endpoint</p><p className="font-medium truncate text-xs font-mono">{sub.webhookUrl}</p></div>}
+                        {sub.webhookUrl && <div><p className="text-muted-foreground text-xs mb-0.5">Webhook</p><p className="font-medium truncate text-xs font-mono">{sub.webhookUrl}</p></div>}
                         {sub.resolvedAt && <div><p className="text-muted-foreground text-xs mb-0.5">Resolved</p><p className="font-medium">{new Date(sub.resolvedAt).toLocaleDateString()}</p></div>}
                       </div>
                       <div className={`flex items-center gap-2 text-sm rounded-lg px-3 py-2 ${sub.tosAccepted ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300"}`}>
                         <span>{sub.tosAccepted ? "✅" : "❌"}</span>
-                        <span>{sub.tosAccepted ? `Terms of Service accepted${sub.tosAcceptedAt ? ` on ${new Date(sub.tosAcceptedAt).toLocaleString()}` : ""}` : "Terms of Service not accepted"}</span>
+                        <span>{sub.tosAccepted ? `ToS accepted${sub.tosAcceptedAt ? ` on ${new Date(sub.tosAcceptedAt).toLocaleString()}` : ""}` : "Terms of Service not accepted"}</span>
                       </div>
-                      {sub.status === "active" && sub.apiKey && (
-                        <div><p className="text-muted-foreground text-xs mb-0.5">API Key</p><p className="font-mono text-xs truncate">{sub.apiKey.slice(0, 24)}…</p></div>
+                      {sub.portalMessage && (
+                        <div className="rounded-lg bg-blue-50 dark:bg-blue-950 px-3 py-2 text-sm">
+                          <p className="text-xs text-muted-foreground mb-0.5">Active announcement</p>
+                          <p className="text-blue-800 dark:text-blue-300">{sub.portalMessage}</p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -253,7 +307,6 @@ export function AdminPage() {
             Consumers are grouped by their plan tier. Moving a consumer to a different group updates their rate limit immediately — no key re-provisioning needed.
           </p>
 
-          {/* Group summary cards */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             {activeByPlan.map(plan => (
               <div key={plan.id} className="rounded-xl border bg-card p-4">
@@ -266,7 +319,6 @@ export function AdminPage() {
             ))}
           </div>
 
-          {/* Per-group member lists */}
           <div className="space-y-8">
             {activeByPlan.map(plan => (
               <div key={plan.id}>
@@ -288,11 +340,10 @@ export function AdminPage() {
                           <div className="flex items-center gap-2 mb-0.5">
                             <p className="font-medium">{sub.companyName || sub.userEmail}</p>
                             {sub.dealerId && <span className="text-xs text-muted-foreground">· {sub.dealerId}</span>}
+                            {sub.portalMessage && <span className="text-xs text-blue-600 dark:text-blue-400">· 📢 announcement active</span>}
                           </div>
                           <p className="text-xs text-muted-foreground">{sub.userEmail}{sub.useCase ? ` · ${sub.useCase}` : ""}</p>
                         </div>
-
-                        {/* Move to group */}
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs text-muted-foreground">Move to:</span>
                           <select
@@ -300,9 +351,7 @@ export function AdminPage() {
                             onChange={e => setMovingPlan(prev => ({ ...prev, [sub.id]: e.target.value }))}
                             className="rounded-lg border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
                           >
-                            {PLANS.map(p => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
+                            {PLANS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                           </select>
                           <button
                             onClick={() => moveToGroup(sub, movingPlan[sub.id] ?? sub.planId)}
@@ -318,6 +367,165 @@ export function AdminPage() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── ANNOUNCEMENTS TAB ── */}
+      {tab === "announcements" && (
+        <div>
+          <p className="text-sm text-muted-foreground mb-6">
+            Publish targeted announcements to consumers in the developer portal. Messages appear in their My Subscriptions view until dismissed.
+          </p>
+
+          {/* Message composer */}
+          <div className="rounded-xl border bg-card p-6 mb-8">
+            <h2 className="font-semibold text-lg mb-4">Publish Announcement</h2>
+
+            <div className="space-y-4">
+              {/* Target group */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Target Group</label>
+                <div className="flex gap-2 flex-wrap">
+                  {([
+                    { id: "all", label: "All Consumers" },
+                    { id: "basic", label: "Basic" },
+                    { id: "pro", label: "Pro" },
+                    { id: "enterprise", label: "Enterprise" },
+                  ] as const).map(t => (
+                    <button key={t.id} onClick={() => setAnnouncementTarget(t.id)}
+                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${announcementTarget === t.id ? "bg-primary text-primary-foreground" : "border border-border hover:bg-muted"}`}>
+                      {t.label}
+                      {t.id !== "all" && (
+                        <span className="ml-1.5 text-xs opacity-70">
+                          ({activeByPlan.find(p => p.id === t.id)?.members.length ?? 0})
+                        </span>
+                      )}
+                      {t.id === "all" && (
+                        <span className="ml-1.5 text-xs opacity-70">({activeCount})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Message type */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Message Type</label>
+                <div className="flex gap-2">
+                  {([
+                    { id: "info", label: "ℹ️ Info", color: "border-blue-300 bg-blue-50 text-blue-800" },
+                    { id: "warning", label: "⚠️ Warning", color: "border-yellow-300 bg-yellow-50 text-yellow-800" },
+                    { id: "success", label: "✅ Success", color: "border-green-300 bg-green-50 text-green-800" },
+                  ] as const).map(t => (
+                    <button key={t.id} onClick={() => setAnnouncementType(t.id)}
+                      className={`rounded-lg px-4 py-2 text-sm font-medium border transition-colors ${announcementType === t.id ? t.color : "border-border hover:bg-muted"}`}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Message text */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Message</label>
+                <textarea
+                  value={announcementMessage}
+                  onChange={e => setAnnouncementMessage(e.target.value)}
+                  placeholder="e.g. Pro plan rate limits are increasing to 50 req/min on June 1. No action needed."
+                  rows={3}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">{announcementMessage.length} characters</p>
+              </div>
+
+              {/* Preview */}
+              {announcementMessage.trim() && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Preview</label>
+                  <div className={`rounded-lg border p-3 text-sm ${
+                    announcementType === "warning" ? "border-yellow-300 bg-yellow-50 text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950 dark:text-yellow-300" :
+                    announcementType === "success" ? "border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-300" :
+                    "border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                  }`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p>{announcementMessage}</p>
+                      <span className="text-xs opacity-50 shrink-0">✕ dismiss</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={publishAnnouncement}
+                  disabled={!announcementMessage.trim() || publishing}
+                  className="rounded-lg bg-primary text-primary-foreground px-6 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-60 transition-colors"
+                >
+                  {publishing ? "Publishing…" : `Publish to ${announcementTarget === "all" ? "All Consumers" : announcementTarget.charAt(0).toUpperCase() + announcementTarget.slice(1)}`}
+                </button>
+                {announcementMessage && (
+                  <button onClick={() => setAnnouncementMessage("")}
+                    className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Active announcements */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-lg">Active Announcements</h2>
+              {withAnnouncements > 0 && (
+                <button onClick={() => clearAnnouncements("all")} disabled={publishing}
+                  className="rounded-lg border border-destructive/40 text-destructive px-3 py-1.5 text-xs font-medium hover:bg-destructive/10 transition-colors disabled:opacity-60">
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {withAnnouncements === 0 ? (
+              <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground text-sm">
+                No active announcements
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {subscriptions.filter(s => s.portalMessage).map(sub => (
+                  <div key={sub.id} className="rounded-xl border bg-card p-4 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium text-sm">{sub.companyName || sub.userEmail}</p>
+                        <PlanBadge planId={sub.planId} />
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">{sub.portalMessage}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        setActing(sub.id);
+                        try {
+                          const res = await authFetch(`${GATEWAY_URL}/admin/subscriptions/${sub.id}/announce`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ message: "", type: "info" }),
+                          });
+                          if (res.ok) {
+                            setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, portalMessage: "" } : s));
+                            showToast("Announcement cleared");
+                          }
+                        } catch { showToast("Error clearing", "error"); }
+                        finally { setActing(null); }
+                      }}
+                      disabled={acting === sub.id}
+                      className="shrink-0 rounded-lg border border-destructive/40 text-destructive px-3 py-1.5 text-xs font-medium hover:bg-destructive/10 disabled:opacity-60 transition-colors"
+                    >
+                      {acting === sub.id ? "…" : "Clear"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -27,6 +27,8 @@ interface Subscription {
   requestedAt: string;
   resolvedAt?: string;
   companyName?: string;
+  portalMessage?: string;
+  portalMessageType?: "info" | "warning" | "success";
 }
 
 interface RegistrationFields {
@@ -428,6 +430,25 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Per-subscription announcements */}
+              {subscriptions.filter(s => s.portalMessage).map(sub => {
+                const colors = {
+                  warning: "border-yellow-300 bg-yellow-50 text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+                  success: "border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-300",
+                  info: "border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300",
+                };
+                const colorClass = colors[sub.portalMessageType ?? "info"];
+                return (
+                  <div key={`announce-${sub.id}`} className={`rounded-lg border p-3 text-sm ${colorClass}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-medium mr-2">{sub.planName} Plan</span>
+                        {sub.portalMessage}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
               {subscriptions.filter(s => s.status !== "rejected").map(sub => {
                 const plan = PLANS.find(p => p.id === sub.planId);
                 return (
