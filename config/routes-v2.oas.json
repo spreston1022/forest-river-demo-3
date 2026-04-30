@@ -3,144 +3,152 @@
   "info": {
     "title": "Forest River API (v2)",
     "version": "2.0.0",
-    "description": "Current version of the Forest River API.\n\n**Breaking changes from v1:**\n- `dealerCode` replaced by `dealerId` (UUID) \u2014 aligns with new dealer management system\n- New required `category` field: Camping, Work & Play, Marine, or Specialty\n\nIf you are still on v1, please migrate before **July 1, 2026**."
+    "description": "Current version of the Forest River Dealer API.\n\n**Breaking changes from v1:**\n- `dealerCode` replaced by `dealerId` (UUID) — aligns with new dealer management system\n- New `category` field on vehicles: Camping, Work & Play, Marine, or Specialty\n\nIf you are still on v1, please migrate before **May 30, 2026**."
   },
   "paths": {
     "/v2/vehicles": {
-      "x-zuplo-path": {
-        "pathMode": "open-api"
-      },
+      "x-zuplo-path": { "pathMode": "open-api" },
       "get": {
         "summary": "List vehicles",
-        "description": "Returns Forest River vehicle inventory. This is the current supported version.",
-        "operationId": "v2-get-vehicles",
-        "tags": [
-          "Vehicles"
+        "description": "Returns the Forest River product catalog. Filter by `category` or `type` to narrow results.",
+        "operationId": "v2-list-vehicles",
+        "tags": ["Vehicles"],
+        "parameters": [
+          { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["Camping", "Work & Play", "Marine", "Specialty"] }, "description": "Filter by product category" },
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Filter by vehicle type (e.g. travel-trailer, fifth-wheel)" },
+          { "name": "year", "in": "query", "schema": { "type": "integer" }, "description": "Filter by model year" }
         ],
         "x-zuplo-route": {
           "corsPolicy": "none",
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": {
-              "baseUrl": "https://echo.zuplo.io"
-            }
+            "options": { "baseUrl": "https://echo.zuplo.io" }
           },
           "policies": {
-            "inbound": [
-              "api-key-inbound",
-              "plan-rate-limit-inbound",
-              "mock-api-inbound"
-            ]
+            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
           }
         },
         "responses": {
           "200": {
-            "description": "Vehicle list (v2 schema)",
+            "description": "Product catalog",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "make": {
-                        "type": "string"
-                      },
-                      "model": {
-                        "type": "string"
-                      },
-                      "year": {
-                        "type": "integer"
-                      },
-                      "type": {
-                        "type": "string"
-                      },
-                      "category": {
-                        "type": "string",
-                        "enum": [
-                          "Camping",
-                          "Work & Play",
-                          "Marine",
-                          "Specialty"
-                        ],
-                        "description": "New in v2 \u2014 Forest River product category."
-                      },
-                      "msrp": {
-                        "type": "number"
-                      },
-                      "dealerId": {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "Replaces `dealerCode` from v1. Now a UUID aligned with the new dealer management system."
-                      },
-                      "available": {
-                        "type": "boolean"
-                      }
-                    }
-                  }
+                  "items": { "$ref": "#/components/schemas/Vehicle" }
                 },
                 "examples": {
                   "vehicle-list": {
-                    "summary": "Sample v2 vehicle inventory",
+                    "summary": "Sample vehicle catalog",
                     "value": [
                       {
                         "id": "veh-001",
+                        "sku": "RW-2892RB-2025",
                         "make": "Forest River",
-                        "model": "Rockwood Ultra Lite 2892RB",
+                        "brand": "Rockwood",
+                        "model": "Ultra Lite 2892RB",
                         "year": 2025,
                         "type": "travel-trailer",
                         "category": "Camping",
                         "msrp": 42999,
+                        "length": "32'4\"",
+                        "sleeps": 6,
+                        "slides": 2,
+                        "weight": 7245,
                         "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
-                        "available": true
+                        "available": true,
+                        "features": ["Solar-ready", "Outdoor kitchen", "King bed"]
                       },
                       {
                         "id": "veh-002",
+                        "sku": "CWP-365SUITE-2025",
                         "make": "Forest River",
-                        "model": "Cherokee Wolf Pack 365SUITE16",
+                        "brand": "Cherokee",
+                        "model": "Wolf Pack 365SUITE16",
                         "year": 2025,
                         "type": "fifth-wheel",
                         "category": "Camping",
                         "msrp": 89995,
+                        "length": "42'6\"",
+                        "sleeps": 8,
+                        "slides": 4,
+                        "weight": 15820,
                         "dealerId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                        "available": true
+                        "available": true,
+                        "features": ["Garage suite", "Residential fridge", "Theater seating"]
                       },
                       {
                         "id": "veh-003",
+                        "sku": "WP-25WP-2024",
                         "make": "Forest River",
-                        "model": "Work and Play 25WP",
+                        "brand": "Work and Play",
+                        "model": "25WP",
                         "year": 2024,
                         "type": "toy-hauler",
                         "category": "Work & Play",
                         "msrp": 38500,
+                        "length": "28'2\"",
+                        "sleeps": 4,
+                        "slides": 1,
+                        "weight": 9200,
                         "dealerId": "f9e8d7c6-b5a4-3210-fedc-ba9876543210",
-                        "available": false
+                        "available": false,
+                        "features": ["15' garage", "Generator prep", "Outdoor shower"]
                       },
                       {
                         "id": "veh-004",
+                        "sku": "BX-45A-2025",
                         "make": "Forest River",
-                        "model": "Berkshire XLT 45A",
+                        "brand": "Berkshire",
+                        "model": "XLT 45A",
                         "year": 2025,
                         "type": "class-a-motorhome",
                         "category": "Camping",
                         "msrp": 289995,
+                        "length": "45'0\"",
+                        "sleeps": 6,
+                        "slides": 4,
+                        "weight": 33000,
                         "dealerId": "c3d4e5f6-a7b8-9012-cdef-012345678901",
-                        "available": true
+                        "available": true,
+                        "features": ["Full-wall slide", "Aqua-Hot heating", "King master suite"]
                       },
                       {
                         "id": "veh-005",
+                        "sku": "TW-232CC-2025",
                         "make": "Forest River",
-                        "model": "Tidewater 232CC",
+                        "brand": "Tidewater",
+                        "model": "232CC",
                         "year": 2025,
                         "type": "center-console-boat",
                         "category": "Marine",
                         "msrp": 54900,
+                        "length": "23'2\"",
+                        "sleeps": 0,
+                        "slides": 0,
+                        "weight": 3800,
                         "dealerId": "e5f6a7b8-c9d0-1234-efab-234567890123",
-                        "available": true
+                        "available": true,
+                        "features": ["Twin Yamaha 115hp", "Live well", "GPS/Chartplotter"]
+                      },
+                      {
+                        "id": "veh-006",
+                        "sku": "SS-2660BH-2025",
+                        "make": "Forest River",
+                        "brand": "Surveyor",
+                        "model": "Super Lite 2660BH",
+                        "year": 2025,
+                        "type": "travel-trailer",
+                        "category": "Camping",
+                        "msrp": 28995,
+                        "length": "29'8\"",
+                        "sleeps": 8,
+                        "slides": 1,
+                        "weight": 5890,
+                        "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                        "available": true,
+                        "features": ["Bunkhouse", "Rear cargo door", "Exterior grill"]
                       }
                     ]
                   }
@@ -148,13 +156,557 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized \u2014 invalid or missing API key"
-          },
-          "429": {
-            "description": "Rate limit exceeded"
-          }
+          "401": { "description": "Unauthorized — invalid or missing API key" },
+          "429": { "description": "Rate limit exceeded" }
         }
+      }
+    },
+
+    "/v2/inventory": {
+      "x-zuplo-path": { "pathMode": "open-api" },
+      "get": {
+        "summary": "Get dealer inventory",
+        "description": "Returns real-time inventory available at dealer locations. Includes units currently on the lot, in-transit, and on order.",
+        "operationId": "v2-get-inventory",
+        "tags": ["Inventory"],
+        "parameters": [
+          { "name": "dealerId", "in": "query", "schema": { "type": "string" }, "description": "Filter by specific dealer UUID" },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["on-lot", "in-transit", "on-order", "sold"] }, "description": "Filter by inventory status" },
+          { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["Camping", "Work & Play", "Marine", "Specialty"] }, "description": "Filter by product category" }
+        ],
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": { "baseUrl": "https://echo.zuplo.io" }
+          },
+          "policies": {
+            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dealer inventory",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "inventory": {
+                    "summary": "Sample dealer inventory",
+                    "value": [
+                      {
+                        "inventoryId": "inv-78234",
+                        "vehicleId": "veh-001",
+                        "sku": "RW-2892RB-2025",
+                        "brand": "Rockwood",
+                        "model": "Ultra Lite 2892RB",
+                        "year": 2025,
+                        "category": "Camping",
+                        "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                        "dealerName": "ABC RV Dealership",
+                        "status": "on-lot",
+                        "color": "Autumn Sunset",
+                        "vin": "4X4FRWB21R1234567",
+                        "msrp": 42999,
+                        "salePrice": 39995,
+                        "daysOnLot": 14,
+                        "arrivedAt": "2026-04-16T00:00:00Z"
+                      },
+                      {
+                        "inventoryId": "inv-78235",
+                        "vehicleId": "veh-004",
+                        "sku": "BX-45A-2025",
+                        "brand": "Berkshire",
+                        "model": "XLT 45A",
+                        "year": 2025,
+                        "category": "Camping",
+                        "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                        "dealerName": "ABC RV Dealership",
+                        "status": "in-transit",
+                        "color": "Silverstone Firemist",
+                        "vin": "4X4FRBX45R1234568",
+                        "msrp": 289995,
+                        "salePrice": 275000,
+                        "daysOnLot": 0,
+                        "estimatedArrival": "2026-05-08T00:00:00Z"
+                      },
+                      {
+                        "inventoryId": "inv-78236",
+                        "vehicleId": "veh-005",
+                        "sku": "TW-232CC-2025",
+                        "brand": "Tidewater",
+                        "model": "232CC",
+                        "year": 2025,
+                        "category": "Marine",
+                        "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                        "dealerName": "ABC RV Dealership",
+                        "status": "on-lot",
+                        "color": "White/Charcoal",
+                        "vin": "FRBT232CC567890",
+                        "msrp": 54900,
+                        "salePrice": 51500,
+                        "daysOnLot": 7,
+                        "arrivedAt": "2026-04-23T00:00:00Z"
+                      },
+                      {
+                        "inventoryId": "inv-78237",
+                        "vehicleId": "veh-003",
+                        "sku": "WP-25WP-2024",
+                        "brand": "Work and Play",
+                        "model": "25WP",
+                        "year": 2024,
+                        "category": "Work & Play",
+                        "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                        "dealerName": "ABC RV Dealership",
+                        "status": "sold",
+                        "color": "Midnight Blue",
+                        "vin": "4X4FRWP25W1234569",
+                        "msrp": 38500,
+                        "salePrice": 35999,
+                        "daysOnLot": 45,
+                        "soldAt": "2026-04-20T00:00:00Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    },
+
+    "/v2/dealers": {
+      "x-zuplo-path": { "pathMode": "open-api" },
+      "get": {
+        "summary": "List dealers",
+        "description": "Returns the Forest River authorized dealer network. Filter by state or proximity.",
+        "operationId": "v2-list-dealers",
+        "tags": ["Dealers"],
+        "parameters": [
+          { "name": "state", "in": "query", "schema": { "type": "string" }, "description": "Filter by US state code (e.g. TX, CA)" },
+          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by product categories the dealer carries" }
+        ],
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": { "baseUrl": "https://echo.zuplo.io" }
+          },
+          "policies": {
+            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dealer list",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "dealers": {
+                    "summary": "Sample dealer network",
+                    "value": [
+                      {
+                        "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                        "dealerCode": "FR-1234",
+                        "name": "ABC RV Dealership",
+                        "address": "1234 RV Way, Indianapolis, IN 46201",
+                        "state": "IN",
+                        "phone": "317-555-0100",
+                        "email": "sales@abcrvdealer.com",
+                        "categories": ["Camping", "Work & Play", "Marine"],
+                        "brands": ["Rockwood", "Cherokee", "Surveyor", "Tidewater"],
+                        "certified": true,
+                        "serviceCenter": true,
+                        "established": 1998,
+                        "inventoryCount": 47
+                      },
+                      {
+                        "dealerId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                        "dealerCode": "FR-5678",
+                        "name": "Midwest RV Center",
+                        "address": "5678 Highway 40, Columbus, OH 43215",
+                        "state": "OH",
+                        "phone": "614-555-0200",
+                        "email": "info@midwestrv.com",
+                        "categories": ["Camping", "Specialty"],
+                        "brands": ["Berkshire", "Georgetown", "Flagstaff"],
+                        "certified": true,
+                        "serviceCenter": true,
+                        "established": 2003,
+                        "inventoryCount": 32
+                      },
+                      {
+                        "dealerId": "f9e8d7c6-b5a4-3210-fedc-ba9876543210",
+                        "dealerCode": "FR-9012",
+                        "name": "Sun State RV & Marine",
+                        "address": "9012 Coastal Blvd, Tampa, FL 33601",
+                        "state": "FL",
+                        "phone": "813-555-0300",
+                        "email": "sales@sunstaterv.com",
+                        "categories": ["Camping", "Marine", "Work & Play"],
+                        "brands": ["Tidewater", "Rockwood", "Work and Play"],
+                        "certified": true,
+                        "serviceCenter": false,
+                        "established": 2010,
+                        "inventoryCount": 28
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    },
+
+    "/v2/orders": {
+      "x-zuplo-path": { "pathMode": "open-api" },
+      "post": {
+        "summary": "Submit an order",
+        "description": "Submit a new vehicle order on behalf of a customer. Returns an order confirmation with tracking number.",
+        "operationId": "v2-create-order",
+        "tags": ["Orders"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["inventoryId", "customerId", "dealerId"],
+                "properties": {
+                  "inventoryId": { "type": "string" },
+                  "customerId": { "type": "string" },
+                  "dealerId": { "type": "string" },
+                  "depositAmount": { "type": "number" },
+                  "notes": { "type": "string" }
+                }
+              },
+              "examples": {
+                "order-request": {
+                  "summary": "Sample order request",
+                  "value": {
+                    "inventoryId": "inv-78234",
+                    "customerId": "cust-44521",
+                    "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                    "depositAmount": 1000,
+                    "notes": "Customer requested tinted windows option"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": { "baseUrl": "https://echo.zuplo.io" }
+          },
+          "policies": {
+            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "order-response": {
+                    "summary": "Sample order confirmation",
+                    "value": {
+                      "orderId": "ord-2026-00891",
+                      "status": "pending",
+                      "inventoryId": "inv-78234",
+                      "sku": "RW-2892RB-2025",
+                      "brand": "Rockwood",
+                      "model": "Ultra Lite 2892RB",
+                      "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                      "dealerName": "ABC RV Dealership",
+                      "customerId": "cust-44521",
+                      "salePrice": 39995,
+                      "depositAmount": 1000,
+                      "estimatedDelivery": "2026-05-15T00:00:00Z",
+                      "createdAt": "2026-04-30T14:23:11Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request" },
+          "401": { "description": "Unauthorized" },
+          "409": { "description": "Unit no longer available" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      },
+      "get": {
+        "summary": "List orders",
+        "description": "Returns all orders associated with your dealer account.",
+        "operationId": "v2-list-orders",
+        "tags": ["Orders"],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["pending", "confirmed", "in-production", "shipped", "delivered", "cancelled"] }, "description": "Filter by order status" }
+        ],
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": { "baseUrl": "https://echo.zuplo.io" }
+          },
+          "policies": {
+            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order list",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "orders": {
+                    "summary": "Sample order list",
+                    "value": [
+                      {
+                        "orderId": "ord-2026-00891",
+                        "status": "in-production",
+                        "sku": "RW-2892RB-2025",
+                        "brand": "Rockwood",
+                        "model": "Ultra Lite 2892RB",
+                        "customerId": "cust-44521",
+                        "salePrice": 39995,
+                        "estimatedDelivery": "2026-05-15T00:00:00Z",
+                        "createdAt": "2026-04-30T14:23:11Z"
+                      },
+                      {
+                        "orderId": "ord-2026-00756",
+                        "status": "shipped",
+                        "sku": "SS-2660BH-2025",
+                        "brand": "Surveyor",
+                        "model": "Super Lite 2660BH",
+                        "customerId": "cust-33201",
+                        "salePrice": 27500,
+                        "estimatedDelivery": "2026-05-02T00:00:00Z",
+                        "createdAt": "2026-04-18T09:12:44Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    },
+
+    "/v2/orders/{orderId}": {
+      "x-zuplo-path": { "pathMode": "open-api" },
+      "get": {
+        "summary": "Get order status",
+        "description": "Returns the current status and details for a specific order.",
+        "operationId": "v2-get-order",
+        "tags": ["Orders"],
+        "parameters": [
+          { "name": "orderId", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Order ID returned at creation" }
+        ],
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": { "baseUrl": "https://echo.zuplo.io" }
+          },
+          "policies": {
+            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order details",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "order": {
+                    "summary": "Sample order detail",
+                    "value": {
+                      "orderId": "ord-2026-00891",
+                      "status": "in-production",
+                      "statusHistory": [
+                        { "status": "pending", "timestamp": "2026-04-30T14:23:11Z" },
+                        { "status": "confirmed", "timestamp": "2026-04-30T15:45:00Z" },
+                        { "status": "in-production", "timestamp": "2026-05-01T08:00:00Z" }
+                      ],
+                      "inventoryId": "inv-78234",
+                      "sku": "RW-2892RB-2025",
+                      "brand": "Rockwood",
+                      "model": "Ultra Lite 2892RB",
+                      "year": 2025,
+                      "color": "Autumn Sunset",
+                      "vin": "4X4FRWB21R1234567",
+                      "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
+                      "dealerName": "ABC RV Dealership",
+                      "customerId": "cust-44521",
+                      "msrp": 42999,
+                      "salePrice": 39995,
+                      "depositAmount": 1000,
+                      "estimatedDelivery": "2026-05-15T00:00:00Z",
+                      "productionPlant": "Elkhart, IN",
+                      "createdAt": "2026-04-30T14:23:11Z",
+                      "updatedAt": "2026-05-01T08:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Order not found" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    },
+
+    "/v2/pricing": {
+      "x-zuplo-path": { "pathMode": "open-api" },
+      "get": {
+        "summary": "Get pricing",
+        "description": "Returns current MSRP and dealer net pricing for vehicles. Dealer net pricing requires Pro or Enterprise plan.",
+        "operationId": "v2-get-pricing",
+        "tags": ["Pricing"],
+        "parameters": [
+          { "name": "sku", "in": "query", "schema": { "type": "string" }, "description": "Filter by specific SKU" },
+          { "name": "year", "in": "query", "schema": { "type": "integer" }, "description": "Filter by model year" }
+        ],
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": { "baseUrl": "https://echo.zuplo.io" }
+          },
+          "policies": {
+            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pricing data",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "pricing": {
+                    "summary": "Sample pricing",
+                    "value": [
+                      {
+                        "sku": "RW-2892RB-2025",
+                        "brand": "Rockwood",
+                        "model": "Ultra Lite 2892RB",
+                        "year": 2025,
+                        "msrp": 42999,
+                        "dealerNet": 34399,
+                        "invoicePrice": 35999,
+                        "effectiveDate": "2026-01-01",
+                        "currency": "USD"
+                      },
+                      {
+                        "sku": "CWP-365SUITE-2025",
+                        "brand": "Cherokee",
+                        "model": "Wolf Pack 365SUITE16",
+                        "year": 2025,
+                        "msrp": 89995,
+                        "dealerNet": 71996,
+                        "invoicePrice": 75596,
+                        "effectiveDate": "2026-01-01",
+                        "currency": "USD"
+                      },
+                      {
+                        "sku": "BX-45A-2025",
+                        "brand": "Berkshire",
+                        "model": "XLT 45A",
+                        "year": 2025,
+                        "msrp": 289995,
+                        "dealerNet": 231996,
+                        "invoicePrice": 243596,
+                        "effectiveDate": "2026-01-01",
+                        "currency": "USD"
+                      },
+                      {
+                        "sku": "TW-232CC-2025",
+                        "brand": "Tidewater",
+                        "model": "232CC",
+                        "year": 2025,
+                        "msrp": 54900,
+                        "dealerNet": 43920,
+                        "invoicePrice": 46165,
+                        "effectiveDate": "2026-01-01",
+                        "currency": "USD"
+                      },
+                      {
+                        "sku": "SS-2660BH-2025",
+                        "brand": "Surveyor",
+                        "model": "Super Lite 2660BH",
+                        "year": 2025,
+                        "msrp": 28995,
+                        "dealerNet": 23196,
+                        "invoicePrice": 24356,
+                        "effectiveDate": "2026-01-01",
+                        "currency": "USD"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Dealer net pricing requires Pro or Enterprise plan" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "schemas": {
+      "Vehicle": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "sku": { "type": "string" },
+          "make": { "type": "string" },
+          "brand": { "type": "string", "description": "Forest River brand (e.g. Rockwood, Cherokee, Tidewater)" },
+          "model": { "type": "string" },
+          "year": { "type": "integer" },
+          "type": { "type": "string" },
+          "category": { "type": "string", "enum": ["Camping", "Work & Play", "Marine", "Specialty"] },
+          "msrp": { "type": "number" },
+          "length": { "type": "string" },
+          "sleeps": { "type": "integer" },
+          "slides": { "type": "integer" },
+          "weight": { "type": "integer", "description": "GVWR in lbs" },
+          "dealerId": { "type": "string", "format": "uuid" },
+          "available": { "type": "boolean" },
+          "features": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Bearer token — your Forest River API key"
       }
     }
   }

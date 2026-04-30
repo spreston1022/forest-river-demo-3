@@ -3,7 +3,7 @@
   "info": {
     "title": "Forest River API (v1)",
     "version": "1.0.0",
-    "description": "⚠️ **This version is deprecated.** Please migrate to v2 before **July 1, 2026**.\n\nSee the [v2 migration guide](/api) for details on breaking changes."
+    "description": "⚠️ **This version is deprecated.** Please migrate to v2 before **May 30, 2026**.\n\n**Breaking changes in v2:**\n- `dealerCode` (string) replaced by `dealerId` (UUID) — dealer system migration\n- New `category` field added to vehicles: Camping, Work & Play, Marine, Specialty\n\nSee the [Migration Guide](/migration-guide) for full details."
   },
   "paths": {
     "/v1/vehicles": {
@@ -12,8 +12,8 @@
       },
       "get": {
         "summary": "List vehicles",
-        "description": "**Deprecated.** Returns Forest River vehicle inventory.\n\n**Breaking changes in v2:**\n- `dealerCode` (short string) replaced by `dealerId` (UUID) following dealer system migration\n- New `category` field added (Camping, Work & Play, Marine, Specialty)\n\nMigrate to `/v2/vehicles` before the sunset date.",
-        "operationId": "v1-get-vehicles",
+        "description": "**Deprecated.** Returns the Forest River product catalog. Migrate to `/v2/vehicles` — the response schema has changed.",
+        "operationId": "v1-list-vehicles",
         "tags": [
           "Vehicles"
         ],
@@ -34,56 +34,26 @@
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ],
-            "outbound": []
+            "outbound": [
+              "v1-deprecation-outbound"
+            ]
           }
         },
         "responses": {
           "200": {
-            "description": "Vehicle list (v1 schema)",
+            "description": "Vehicle list (v1 schema — note: missing `category`, uses `dealerCode` not `dealerId`)",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "make": {
-                        "type": "string"
-                      },
-                      "model": {
-                        "type": "string"
-                      },
-                      "year": {
-                        "type": "integer"
-                      },
-                      "type": {
-                        "type": "string"
-                      },
-                      "msrp": {
-                        "type": "number"
-                      },
-                      "dealerCode": {
-                        "type": "string",
-                        "deprecated": true,
-                        "description": "⚠️ Deprecated — replaced by `dealerId` (UUID) in v2."
-                      },
-                      "available": {
-                        "type": "boolean"
-                      }
-                    }
-                  }
-                },
                 "examples": {
                   "vehicle-list": {
-                    "summary": "Sample v1 vehicle inventory",
+                    "summary": "Sample v1 vehicle catalog",
                     "value": [
                       {
                         "id": "veh-001",
+                        "sku": "RW-2892RB-2025",
                         "make": "Forest River",
-                        "model": "Rockwood Ultra Lite 2892RB",
+                        "brand": "Rockwood",
+                        "model": "Ultra Lite 2892RB",
                         "year": 2025,
                         "type": "travel-trailer",
                         "msrp": 42999,
@@ -92,8 +62,10 @@
                       },
                       {
                         "id": "veh-002",
+                        "sku": "CWP-365SUITE-2025",
                         "make": "Forest River",
-                        "model": "Cherokee Wolf Pack 365SUITE16",
+                        "brand": "Cherokee",
+                        "model": "Wolf Pack 365SUITE16",
                         "year": 2025,
                         "type": "fifth-wheel",
                         "msrp": 89995,
@@ -102,8 +74,10 @@
                       },
                       {
                         "id": "veh-003",
+                        "sku": "WP-25WP-2024",
                         "make": "Forest River",
-                        "model": "Work and Play 25WP",
+                        "brand": "Work and Play",
+                        "model": "25WP",
                         "year": 2024,
                         "type": "toy-hauler",
                         "msrp": 38500,
@@ -117,10 +91,172 @@
             }
           },
           "401": {
-            "description": "Unauthorized — invalid or missing API key"
+            "description": "Unauthorized"
+          },
+          "410": {
+            "description": "Gone — v1 has been retired"
           },
           "429": {
             "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Brownout — v1 retiring May 30, 2026"
+          }
+        }
+      }
+    },
+    "/v1/inventory": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "get": {
+        "summary": "Get dealer inventory",
+        "description": "**Deprecated.** Returns dealer inventory. Migrate to `/v2/inventory`.",
+        "operationId": "v1-get-inventory",
+        "tags": [
+          "Inventory"
+        ],
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "v1-sunset-inbound",
+              "v1-brownout-inbound",
+              "api-key-inbound",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ],
+            "outbound": [
+              "v1-deprecation-outbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inventory (v1 schema — uses `dealerCode`)",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "inventory": {
+                    "summary": "Sample v1 inventory",
+                    "value": [
+                      {
+                        "inventoryId": "inv-78234",
+                        "sku": "RW-2892RB-2025",
+                        "brand": "Rockwood",
+                        "model": "Ultra Lite 2892RB",
+                        "year": 2025,
+                        "dealerCode": "FR-1234",
+                        "status": "on-lot",
+                        "msrp": 42999,
+                        "salePrice": 39995
+                      },
+                      {
+                        "inventoryId": "inv-78235",
+                        "sku": "BX-45A-2025",
+                        "brand": "Berkshire",
+                        "model": "XLT 45A",
+                        "year": 2025,
+                        "dealerCode": "FR-1234",
+                        "status": "in-transit",
+                        "msrp": 289995,
+                        "salePrice": 275000
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "410": {
+            "description": "Gone — v1 retired"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Brownout"
+          }
+        }
+      }
+    },
+    "/v1/orders": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "get": {
+        "summary": "List orders",
+        "description": "**Deprecated.** Returns dealer orders. Migrate to `/v2/orders`.",
+        "operationId": "v1-list-orders",
+        "tags": [
+          "Orders"
+        ],
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "v1-sunset-inbound",
+              "v1-brownout-inbound",
+              "api-key-inbound",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ],
+            "outbound": [
+              "v1-deprecation-outbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Orders (v1 schema)",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "orders": {
+                    "summary": "Sample v1 orders",
+                    "value": [
+                      {
+                        "orderId": "ord-2026-00891",
+                        "status": "in-production",
+                        "sku": "RW-2892RB-2025",
+                        "dealerCode": "FR-1234",
+                        "salePrice": 39995,
+                        "createdAt": "2026-04-30T14:23:11Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "410": {
+            "description": "Gone — v1 retired"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Brownout"
           }
         }
       }
