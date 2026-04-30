@@ -266,6 +266,77 @@
           }
         }
       }
+    },
+    "/admin/announcements": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Admin \u2014 publish announcement to a plan group",
+        "operationId": "admin-publish-announcement",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminPublishAnnouncement",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Announcement published"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/admin/subscriptions/{id}/announce": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Admin \u2014 set or clear announcement on a single consumer",
+        "operationId": "admin-announce-to-consumer",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminAnnounceToConsumer",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Announcement updated"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
     }
   }
 }
