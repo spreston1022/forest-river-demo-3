@@ -53,6 +53,12 @@ export function AdminPage() {
   const [announcementType, setAnnouncementType] = useState<"info" | "warning" | "success">("info");
   const [publishing, setPublishing] = useState(false);
 
+  // Email state
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [emailTarget, setEmailTarget] = useState<"all" | "basic" | "pro" | "enterprise">("all");
+  const [sendingEmail, setSendingEmail] = useState(false);
+
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
@@ -156,6 +162,31 @@ export function AdminPage() {
       }
     } catch { showToast("Error clearing announcements", "error"); }
     finally { setPublishing(false); }
+  };
+
+  const sendEmail = async () => {
+    if (!emailSubject.trim() || !emailMessage.trim()) return;
+    setSendingEmail(true);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: emailSubject,
+          message: emailMessage,
+          target: emailTarget,
+        }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        showToast(`✅ Email sent to ${result.sent} consumer${result.sent !== 1 ? "s" : ""}`);
+        setEmailSubject("");
+        setEmailMessage("");
+      } else {
+        showToast(`Failed: ${await res.text()}`, "error");
+      }
+    } catch { showToast("Error sending email", "error"); }
+    finally { setSendingEmail(false); }
   };
 
   const isAdmin = (auth.profile as any)?.email === "sam@zuplo.com";
@@ -470,6 +501,76 @@ export function AdminPage() {
                     Clear
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Email composer */}
+          <div className="rounded-xl border bg-card p-6 mb-8">
+            <h2 className="font-semibold text-lg mb-1">Send Email</h2>
+            <p className="text-sm text-muted-foreground mb-4">Send a direct email to consumers in a plan group via Resend.</p>
+
+            <div className="space-y-4">
+              {/* Target */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Target Group</label>
+                <div className="flex gap-2 flex-wrap">
+                  {([
+                    { id: "all", label: "All Consumers" },
+                    { id: "basic", label: "Basic" },
+                    { id: "pro", label: "Pro" },
+                    { id: "enterprise", label: "Enterprise" },
+                  ] as const).map(t => (
+                    <button key={t.id} onClick={() => setEmailTarget(t.id)}
+                      className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${emailTarget === t.id ? "bg-primary text-primary-foreground" : "border border-border hover:bg-muted"}`}>
+                      {t.label}
+                      <span className="ml-1.5 text-xs opacity-70">
+                        ({t.id === "all" ? activeCount : (activeByPlan.find(p => p.id === t.id)?.members.length ?? 0)})
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={e => setEmailSubject(e.target.value)}
+                  placeholder="e.g. Important update to your Forest River API access"
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Message</label>
+                <textarea
+                  value={emailMessage}
+                  onChange={e => setEmailMessage(e.target.value)}
+                  placeholder="Write your message here. Plain text or simple HTML supported."
+                  rows={5}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 items-center">
+                <button
+                  onClick={sendEmail}
+                  disabled={!emailSubject.trim() || !emailMessage.trim() || sendingEmail}
+                  className="rounded-lg bg-primary text-primary-foreground px-6 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-60 transition-colors"
+                >
+                  {sendingEmail ? "Sending…" : `Send to ${emailTarget === "all" ? "All Consumers" : emailTarget.charAt(0).toUpperCase() + emailTarget.slice(1)}`}
+                </button>
+                {(emailSubject || emailMessage) && (
+                  <button onClick={() => { setEmailSubject(""); setEmailMessage(""); }}
+                    className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">
+                    Clear
+                  </button>
+                )}
+                <p className="text-xs text-muted-foreground">Emails delivered via Resend · Forest River branding applied automatically</p>
               </div>
             </div>
           </div>
