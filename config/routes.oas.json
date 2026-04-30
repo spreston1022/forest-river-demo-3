@@ -6,39 +6,6 @@
     "description": "Forest River demo API gateway"
   },
   "paths": {
-    "/path-1": {
-      "x-zuplo-path": {
-        "pathMode": "open-api"
-      },
-      "get": {
-        "summary": "Echo endpoint",
-        "description": "Forwards to echo.zuplo.io \u2014 requires a valid API key.",
-        "operationId": "get-path-1",
-        "x-zuplo-route": {
-          "corsPolicy": "none",
-          "handler": {
-            "export": "urlForwardHandler",
-            "module": "$import(@zuplo/runtime)",
-            "options": {
-              "baseUrl": "https://echo.zuplo.io"
-            }
-          },
-          "policies": {
-            "inbound": [
-              "api-key-inbound"
-            ]
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response from echo service"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
     "/openapi": {
       "x-zuplo-path": {
         "pathMode": "open-api"
@@ -368,6 +335,36 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/v2/health": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "get": {
+        "summary": "Health check",
+        "operationId": "health-check",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "api-key-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
