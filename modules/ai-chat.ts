@@ -3,11 +3,6 @@ import { ZuploContext, ZuploRequest, environment } from "@zuplo/runtime";
 const ZUPLO_ACCOUNT = "lavender-outstanding-bear";
 const BASE = `https://dev.zuplo.com/v1/accounts/${ZUPLO_ACCOUNT}/key-buckets`;
 const MCP_SERVER_BASE = "https://forest-river-demo-main-fb06bf1.zuplo.app/mcp";
-const PLANS = ["basic", "pro", "enterprise"];
-
-function subToConsumerName(sub: string, planId: string): string {
-  return `${sub.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 100)}-${planId}`;
-}
 
 async function zuploGet(path: string): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
@@ -18,16 +13,26 @@ async function zuploGet(path: string): Promise<any> {
 }
 
 async function getDealerApiKey(userId: string, context: ZuploContext): Promise<string | undefined> {
-  for (const planId of PLANS) {
-    const name = subToConsumerName(userId, planId);
+  // List all consumers and filter by userId in metadata — same pattern as getMySubscriptions
+  const all = await zuploGet("/consumers?limit=1000");
+  const consumers: any[] = all.data ?? [];
+  context.log.info(`ai-chat: ${consumers.length} total consumers, searching for userId=${userId}`);
+
+  const mine = consumers.filter(
+    (c) => c.metadata?.["userId"] === userId && c.tags?.["status"] === "active"
+  );
+  context.log.info(`ai-chat: ${mine.length} active consumers found for this user`);
+
+  for (const c of mine) {
     try {
-      const consumer = await zuploGet(`/consumers/${name}?include-api-keys=true&key-format=visible`);
-      const status = consumer.tags?.["status"];
-      const key = consumer.apiKeys?.[0]?.key;
-      context.log.info(`ai-chat: consumer=${name} status=${status} hasKey=${!!key}`);
-      if (status === "active" && key) return key;
+      const withKey = await zuploGet(`/consumers/${c.name}?include-api-keys=true&key-format=visible`);
+      const key = withKey.apiKeys?.[0]?.key;
+      if (key) {
+        context.log.info(`ai-chat: using key from consumer ${c.name}`);
+        return key;
+      }
     } catch (err) {
-      context.log.debug(`ai-chat: no consumer ${name}: ${err}`);
+      context.log.debug(`ai-chat: failed to get key for consumer ${c.name}: ${err}`);
     }
   }
   return undefined;
