@@ -27,7 +27,8 @@
           },
           "policies": {
             "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
-          }
+          },
+          "mcp": { "type": "tool" }
         },
         "responses": {
           "200": {
@@ -183,7 +184,8 @@
           },
           "policies": {
             "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
-          }
+          },
+          "mcp": { "type": "tool" }
         },
         "responses": {
           "200": {
@@ -298,7 +300,8 @@
           },
           "policies": {
             "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
-          }
+          },
+          "mcp": { "type": "tool" }
         },
         "responses": {
           "200": {
@@ -412,7 +415,8 @@
           },
           "policies": {
             "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
-          }
+          },
+          "mcp": { "type": "tool" }
         },
         "responses": {
           "201": {
@@ -465,7 +469,8 @@
           },
           "policies": {
             "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
-          }
+          },
+          "mcp": { "type": "tool" }
         },
         "responses": {
           "200": {
@@ -529,7 +534,8 @@
           },
           "policies": {
             "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
-          }
+          },
+          "mcp": { "type": "tool" }
         },
         "responses": {
           "200": {
@@ -597,7 +603,8 @@
           },
           "policies": {
             "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
-          }
+          },
+          "mcp": { "type": "tool" }
         },
         "responses": {
           "200": {
