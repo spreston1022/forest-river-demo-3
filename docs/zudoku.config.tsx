@@ -2,6 +2,7 @@ import type { ZudokuConfig } from "zudoku";
 import { createApiIdentityPlugin } from "zudoku/plugins";
 import { SubscribePage } from "./SubscribePage";
 import { AdminPage } from "./AdminPage";
+import { ChatWidget } from "./ChatWidget";
 
 const config: ZudokuConfig = {
   site: {
@@ -157,6 +158,10 @@ const config: ZudokuConfig = {
       },
     },
   ],
+
+  slots: {
+    "footer-after": <ChatWidget />,
+  },
 
   plugins: [
     createApiIdentityPlugin({
