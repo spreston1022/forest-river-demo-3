@@ -58,6 +58,13 @@ export async function aiChatHandler(request: ZuploRequest, context: ZuploContext
     mcpApiKey = environment.MCP_SERVICE_KEY;
   }
 
+  if (!mcpApiKey) {
+    return new Response(
+      JSON.stringify({ error: "No active API subscription found. Subscribe to a plan at /subscribe to use the AI assistant." }),
+      { status: 403, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   const body = await request.json();
 
   const openaiBody = {
