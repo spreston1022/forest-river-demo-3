@@ -13,20 +13,21 @@ async function zuploGet(path: string): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { Authorization: `Bearer ${environment.API_KEY}`, "Content-Type": "application/json" },
   });
-  if (!res.ok) throw new Error(`Zuplo API ${res.status}`);
+  if (!res.ok) throw new Error(`Zuplo API ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-async function getDealerApiKey(userId: string): Promise<string | undefined> {
+async function getDealerApiKey(userId: string, context: ZuploContext): Promise<string | undefined> {
   for (const planId of PLANS) {
+    const name = subToConsumerName(userId, planId);
     try {
-      const name = subToConsumerName(userId, planId);
       const consumer = await zuploGet(`/consumers/${name}?include-api-keys=true&key-format=visible`);
-      if (consumer.tags?.["status"] === "active" && consumer.apiKeys?.[0]?.key) {
-        return consumer.apiKeys[0].key;
-      }
-    } catch {
-      // No consumer for this plan, try next
+      const status = consumer.tags?.["status"];
+      const key = consumer.apiKeys?.[0]?.key;
+      context.log.info(`ai-chat: consumer=${name} status=${status} hasKey=${!!key}`);
+      if (status === "active" && key) return key;
+    } catch (err) {
+      context.log.debug(`ai-chat: no consumer ${name}: ${err}`);
     }
   }
   return undefined;
@@ -34,7 +35,6 @@ async function getDealerApiKey(userId: string): Promise<string | undefined> {
 
 export async function aiChatHandler(request: ZuploRequest, context: ZuploContext) {
   const openaiKey = environment.OPENAI_API_KEY;
-
   if (!openaiKey) {
     return new Response(JSON.stringify({ error: "OpenAI key not configured" }), {
       status: 500,
@@ -42,20 +42,18 @@ export async function aiChatHandler(request: ZuploRequest, context: ZuploContext
     });
   }
 
-  const userId = (request.user as any)?.sub as string | undefined;
+  const userId = request.user?.sub as string | undefined;
+  context.log.info(`ai-chat: request from userId=${userId ?? "none"}`);
 
   let mcpApiKey: string | undefined;
   if (userId) {
-    try {
-      mcpApiKey = await getDealerApiKey(userId);
-    } catch {
-      context.log.warn("Failed to look up dealer API key for " + userId);
-    }
+    mcpApiKey = await getDealerApiKey(userId, context);
   }
 
   if (!mcpApiKey) {
+    context.log.warn(`ai-chat: no active subscription key found for userId=${userId}`);
     return new Response(
-      JSON.stringify({ error: "No active API subscription found. Subscribe to a plan at /subscribe to use the AI assistant." }),
+      JSON.stringify({ error: "no_subscription", message: "No active API subscription. Go to Plans to subscribe." }),
       { status: 403, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -69,7 +67,7 @@ export async function aiChatHandler(request: ZuploRequest, context: ZuploContext
         type: "mcp",
         server_label: "forest-river-api",
         server_description: "Forest River Dealer API — vehicles, inventory, pricing, dealers, orders",
-        server_url: mcpApiKey ? `${MCP_SERVER_BASE}?apiKey=${mcpApiKey}` : MCP_SERVER_BASE,
+        server_url: `${MCP_SERVER_BASE}?apiKey=${mcpApiKey}`,
         require_approval: "never",
         allowed_tools: ["list_vehicles", "get_inventory", "list_dealers", "get_pricing", "list_orders", "get_order"],
       },
@@ -78,10 +76,7 @@ export async function aiChatHandler(request: ZuploRequest, context: ZuploContext
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openaiKey}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
     body: JSON.stringify(openaiBody),
   });
 
