@@ -48,8 +48,25 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dealerKey, setDealerKey] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch the user's active API key from their subscription on mount
+  useEffect(() => {
+    if (!auth.isAuthenticated || !authentication) return;
+    (async () => {
+      try {
+        const req = new Request(`${GATEWAY_URL}/subscriptions`);
+        const signed = await authentication.signRequest(req);
+        const res = await fetch(signed);
+        if (!res.ok) return;
+        const subs: any[] = await res.json();
+        const active = subs.find((s) => s.status === "active" && s.apiKey);
+        if (active) setDealerKey(active.apiKey);
+      } catch {}
+    })();
+  }, [auth.isAuthenticated, authentication]);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -76,6 +93,7 @@ export function ChatWidget() {
         body: JSON.stringify({
           model: "gpt-4o",
           instructions: SYSTEM_PROMPT,
+          dealerKey,
           input: [
             ...history.map(m => ({ role: m.role, content: m.content })),
             { role: "user", content: text },
@@ -115,7 +133,7 @@ export function ChatWidget() {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, authentication]);
+  }, [messages, loading, authentication, dealerKey]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
@@ -125,13 +143,11 @@ export function ChatWidget() {
 
   return createPortal(
     <>
-      {/* Chat window */}
       {open && (
         <div
           className="fixed bottom-20 right-4 z-50 flex flex-col bg-background border rounded-2xl shadow-2xl"
           style={{ width: 360, height: 520 }}
         >
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b rounded-t-2xl bg-primary text-primary-foreground">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">FR</div>
@@ -143,19 +159,24 @@ export function ChatWidget() {
             <button onClick={() => setOpen(false)} className="opacity-75 hover:opacity-100 text-lg leading-none">×</button>
           </div>
 
-          {/* Chat messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
             {messages.length === 0 && (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground text-center pt-2">Ask me about vehicles, inventory, pricing, dealers, or orders</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {SUGGESTED.map(s => (
-                    <button key={s} onClick={() => send(s)}
-                      className="rounded-lg border bg-card text-xs px-2 py-1.5 text-left hover:bg-muted transition-colors font-medium leading-tight">
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                <p className="text-xs text-muted-foreground text-center pt-2">
+                  {dealerKey
+                    ? "Ask me about vehicles, inventory, pricing, dealers, or orders"
+                    : "Subscribe to a plan to use the AI assistant"}
+                </p>
+                {dealerKey && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {SUGGESTED.map(s => (
+                      <button key={s} onClick={() => send(s)}
+                        className="rounded-lg border bg-card text-xs px-2 py-1.5 text-left hover:bg-muted transition-colors font-medium leading-tight">
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -196,20 +217,19 @@ export function ChatWidget() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
           <div className="px-3 pb-3 pt-2 border-t flex gap-2">
             <input
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
-              placeholder="Ask about vehicles, inventory…"
-              disabled={loading}
+              placeholder={dealerKey ? "Ask about vehicles, inventory…" : "No active subscription"}
+              disabled={loading || !dealerKey}
               className="flex-1 rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
             />
             <button
               onClick={() => send(input)}
-              disabled={!input.trim() || loading}
+              disabled={!input.trim() || loading || !dealerKey}
               className="rounded-xl bg-primary text-primary-foreground px-3 py-2 text-sm font-semibold disabled:opacity-50 hover:bg-primary/90 transition-colors"
             >
               ↑
@@ -218,7 +238,6 @@ export function ChatWidget() {
         </div>
       )}
 
-      {/* Floating bubble */}
       <button
         onClick={() => setOpen(o => !o)}
         className="fixed bottom-4 right-4 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center"
