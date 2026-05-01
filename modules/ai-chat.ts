@@ -53,11 +53,6 @@ export async function aiChatHandler(request: ZuploRequest, context: ZuploContext
     }
   }
 
-  // Fall back to service key if the user has no active subscription
-  if (!mcpApiKey) {
-    mcpApiKey = environment.MCP_SERVICE_KEY;
-  }
-
   if (!mcpApiKey) {
     return new Response(
       JSON.stringify({ error: "No active API subscription found. Subscribe to a plan at /subscribe to use the AI assistant." }),
