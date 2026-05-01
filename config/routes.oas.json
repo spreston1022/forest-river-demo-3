@@ -385,13 +385,14 @@
             "options": {
               "name": "forest-river-api",
               "version": "1.0.0",
+              "debugMode": true,
               "operations": [
-                { "file": "./config/routes-v2.oas.json", "id": "v2-list-vehicles" },
-                { "file": "./config/routes-v2.oas.json", "id": "v2-get-inventory" },
-                { "file": "./config/routes-v2.oas.json", "id": "v2-list-dealers" },
-                { "file": "./config/routes-v2.oas.json", "id": "v2-get-pricing" },
-                { "file": "./config/routes-v2.oas.json", "id": "v2-list-orders" },
-                { "file": "./config/routes-v2.oas.json", "id": "v2-get-order" }
+                { "file": "./routes-v2.oas.json", "id": "v2-list-vehicles" },
+                { "file": "./routes-v2.oas.json", "id": "v2-get-inventory" },
+                { "file": "./routes-v2.oas.json", "id": "v2-list-dealers" },
+                { "file": "./routes-v2.oas.json", "id": "v2-get-pricing" },
+                { "file": "./routes-v2.oas.json", "id": "v2-list-orders" },
+                { "file": "./routes-v2.oas.json", "id": "v2-get-order" }
               ]
             }
           },
