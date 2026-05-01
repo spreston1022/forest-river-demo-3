@@ -344,7 +344,7 @@
         "pathMode": "open-api"
       },
       "post": {
-        "summary": "AI Chat — OpenAI proxy via Zuplo MCP",
+        "summary": "AI Chat \u2014 OpenAI proxy via Zuplo MCP",
         "operationId": "ai-chat",
         "x-internal": true,
         "x-zuplo-route": {
@@ -362,47 +362,6 @@
         "responses": {
           "200": {
             "description": "OpenAI response"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
-    "/mcp": {
-      "x-zuplo-path": {
-        "pathMode": "open-api"
-      },
-      "post": {
-        "summary": "MCP Server",
-        "operationId": "mcp-server",
-        "x-internal": true,
-        "x-zuplo-route": {
-          "corsPolicy": "none",
-          "handler": {
-            "export": "mcpServerHandler",
-            "module": "$import(@zuplo/runtime)",
-            "options": {
-              "name": "forest-river-api",
-              "version": "1.0.0",
-              "debugMode": true,
-              "operations": [
-                { "file": "./routes-v2.oas.json", "id": "v2-list-vehicles" },
-                { "file": "./routes-v2.oas.json", "id": "v2-get-inventory" },
-                { "file": "./routes-v2.oas.json", "id": "v2-list-dealers" },
-                { "file": "./routes-v2.oas.json", "id": "v2-get-pricing" },
-                { "file": "./routes-v2.oas.json", "id": "v2-list-orders" },
-                { "file": "./routes-v2.oas.json", "id": "v2-get-order" }
-              ]
-            }
-          },
-          "policies": {
-            "inbound": ["mcp-query-param-to-header-inbound", "api-key-inbound"]
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "MCP response"
           },
           "401": {
             "description": "Unauthorized"
