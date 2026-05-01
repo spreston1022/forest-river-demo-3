@@ -6,7 +6,7 @@ import { ChatWidget } from "./ChatWidget";
 
 const config: ZudokuConfig = {
   site: {
-    title: "Forest River Developer Portal",
+    title: "Forest River",
     logo: {
       src: {
         light: "https://www.forestriverinc.com/images/logo-reversed.png",
@@ -106,18 +106,11 @@ const config: ZudokuConfig = {
 
   navigation: [
     {
-      type: "doc",
-      file: "introduction",
-      path: "/",
-      label: "Home",
-      display: "hide",
-    },
-    {
       type: "category",
       label: "Documentation",
       icon: "book",
       items: [
-        { type: "doc", file: "introduction", label: "Introduction" },
+        { type: "doc", file: "introduction", path: "/", label: "Introduction" },
         { type: "doc", file: "quickstart", label: "Quick Start" },
         { type: "doc", file: "authentication", label: "Authentication" },
         { type: "doc", file: "migration-guide", label: "Migration Guide", icon: "alert-triangle" },
