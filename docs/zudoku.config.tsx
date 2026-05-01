@@ -153,7 +153,12 @@ const config: ZudokuConfig = {
   ],
 
   slots: {
-    "head-navigation-start": <span className="font-semibold text-sm">Forest River</span>,
+    "head-navigation-start": (
+      <span className="flex items-center gap-3">
+        <span className="w-px h-5 bg-border" />
+        <span className="font-bold text-xl tracking-wide text-primary">Forest River</span>
+      </span>
+    ),
     "head-navigation-end": <ChatWidget />,
   },
 
