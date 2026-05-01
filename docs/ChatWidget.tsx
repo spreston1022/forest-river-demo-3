@@ -31,13 +31,12 @@ const SUGGESTED = [
 ];
 
 const TOOL_LABELS: Record<string, string> = {
-  "v2-list-vehicles": "🚐 Searched vehicles",
-  "v2-get-inventory": "📦 Checked inventory",
-  "v2-list-dealers": "📍 Found dealers",
-  "v2-get-pricing": "💰 Retrieved pricing",
-  "v2-list-orders": "📋 Listed orders",
-  "v2-get-order": "🔍 Got order details",
-  "v2-create-order": "✅ Created order",
+  list_vehicles: "🚐 Searched vehicles",
+  get_inventory: "📦 Checked inventory",
+  list_dealers: "📍 Found dealers",
+  get_pricing: "💰 Retrieved pricing",
+  list_orders: "📋 Listed orders",
+  get_order: "🔍 Got order details",
 };
 
 export function ChatWidget() {
@@ -114,7 +113,7 @@ export function ChatWidget() {
       let assistantText = data.output_text ?? "";
 
       for (const item of data.output ?? []) {
-        if (item.type === "mcp_call") toolCalls.push(item.name);
+        if (item.type === "function_call") toolCalls.push(item.name);
         if (item.type === "message") {
           for (const c of item.content ?? []) {
             if (c.type === "output_text") assistantText += c.text;
