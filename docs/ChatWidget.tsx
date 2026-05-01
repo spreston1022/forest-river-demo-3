@@ -88,6 +88,9 @@ export function ChatWidget() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (res.status === 403) {
+          throw new Error("No active API subscription. Go to Plans to subscribe and get access.");
+        }
         throw new Error(err.error?.message ?? `Error ${res.status}`);
       }
 
