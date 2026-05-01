@@ -160,7 +160,7 @@ const config: ZudokuConfig = {
   ],
 
   slots: {
-    "footer-after": <ChatWidget />,
+    "head-navigation-end": <ChatWidget />,
   },
 
   plugins: [
