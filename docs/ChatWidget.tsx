@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useAuth, useZudoku } from "zudoku/hooks";
 
 const GATEWAY_URL = import.meta.env.ZUPLO_PUBLIC_SERVER_URL ?? "https://forest-river-demo-main-fb06bf1.zuplo.app";
@@ -122,7 +123,7 @@ export function ChatWidget() {
 
   if (!auth.isAuthenticated) return null;
 
-  return (
+  return createPortal(
     <>
       {/* Chat window */}
       {open && (
@@ -234,7 +235,8 @@ export function ChatWidget() {
           </svg>
         )}
       </button>
-    </>
+    </>,
+    document.body
   );
 }
 
