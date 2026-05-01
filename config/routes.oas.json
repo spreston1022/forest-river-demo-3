@@ -369,6 +369,46 @@
         }
       }
     },
+    "/mcp": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "MCP Server",
+        "operationId": "mcp-server",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "mcpServerHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "name": "forest-river-api",
+              "version": "1.0.0",
+              "operations": [
+                { "file": "./config/routes-v2.oas.json", "id": "v2-list-vehicles" },
+                { "file": "./config/routes-v2.oas.json", "id": "v2-get-inventory" },
+                { "file": "./config/routes-v2.oas.json", "id": "v2-list-dealers" },
+                { "file": "./config/routes-v2.oas.json", "id": "v2-get-pricing" },
+                { "file": "./config/routes-v2.oas.json", "id": "v2-list-orders" },
+                { "file": "./config/routes-v2.oas.json", "id": "v2-get-order" }
+              ]
+            }
+          },
+          "policies": {
+            "inbound": ["mcp-query-param-to-header-inbound", "api-key-inbound"]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/v2/health": {
       "x-zuplo-path": {
         "pathMode": "open-api"

@@ -102,6 +102,19 @@
         "export": "default",
         "module": "$import(./modules/v1-sunset)"
       }
+    },
+    {
+      "name": "mcp-query-param-to-header-inbound",
+      "policyType": "query-param-to-header-inbound",
+      "handler": {
+        "export": "QueryParamToHeaderInboundPolicy",
+        "module": "$import(@zuplo/runtime)",
+        "options": {
+          "queryParam": "apiKey",
+          "headerName": "Authorization",
+          "headerValue": "Bearer {value}"
+        }
+      }
     }
   ],
   "corsPolicies": [
