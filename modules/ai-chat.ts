@@ -32,7 +32,7 @@ export async function aiChatHandler(request: ZuploRequest, context: ZuploContext
         server_description: "Forest River Dealer API — vehicles, inventory, pricing, dealers, orders",
         server_url: `${MCP_SERVER_BASE}?apiKey=${dealerKey}`,
         require_approval: "never",
-        allowed_tools: ["list_vehicles", "get_inventory", "list_dealers", "get_pricing", "list_orders", "get_order"],
+        allowed_tools: ["v2-list-vehicles", "v2-get-inventory", "v2-list-dealers", "v2-get-pricing", "v2-list-orders", "v2-get-order"],
       },
     ],
   };

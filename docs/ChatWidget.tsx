@@ -31,13 +31,13 @@ const SUGGESTED = [
 ];
 
 const TOOL_LABELS: Record<string, string> = {
-  list_vehicles: "🚐 Searched vehicles",
-  get_inventory: "📦 Checked inventory",
-  list_dealers: "📍 Found dealers",
-  get_pricing: "💰 Retrieved pricing",
-  list_orders: "📋 Listed orders",
-  get_order: "🔍 Got order details",
-  create_order: "✅ Created order",
+  "v2-list-vehicles": "🚐 Searched vehicles",
+  "v2-get-inventory": "📦 Checked inventory",
+  "v2-list-dealers": "📍 Found dealers",
+  "v2-get-pricing": "💰 Retrieved pricing",
+  "v2-list-orders": "📋 Listed orders",
+  "v2-get-order": "🔍 Got order details",
+  "v2-create-order": "✅ Created order",
 };
 
 export function ChatWidget() {
