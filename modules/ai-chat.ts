@@ -52,7 +52,15 @@ export async function aiChatHandler(request: ZuploRequest, context: ZuploContext
 
   let mcpApiKey: string | undefined;
   if (userId) {
-    mcpApiKey = await getDealerApiKey(userId, context);
+    try {
+      mcpApiKey = await getDealerApiKey(userId, context);
+    } catch (err) {
+      context.log.error(`ai-chat: getDealerApiKey threw: ${err}`);
+      return new Response(JSON.stringify({ error: "internal", message: "Failed to look up subscription. Check Zuplo logs." }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
   if (!mcpApiKey) {
