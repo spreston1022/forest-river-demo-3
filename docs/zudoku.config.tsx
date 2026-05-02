@@ -9,7 +9,7 @@ const config: ZudokuConfig = {
     title: "Forest River",
     logo: {
       src: {
-        light: "https://www.forestriverinc.com/images/logo-reversed.png",
+        light: "https://www.forestriverinc.com/images/logo.png",
         dark: "https://www.forestriverinc.com/images/logo-reversed.png",
       },
       width: "160px",
