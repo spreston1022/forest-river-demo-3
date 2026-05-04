@@ -34,11 +34,57 @@
       }
     },
     {
-      "name": "maintenance-mode-inbound",
+      "name": "kill-switch-vehicles",
       "policyType": "custom-code-inbound",
       "handler": {
         "export": "default",
-        "module": "$import(./modules/maintenance)"
+        "module": "$import(./modules/maintenance)",
+        "options": { "routeKey": "vehicles" }
+      }
+    },
+    {
+      "name": "kill-switch-inventory",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/maintenance)",
+        "options": { "routeKey": "inventory" }
+      }
+    },
+    {
+      "name": "kill-switch-orders",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/maintenance)",
+        "options": { "routeKey": "orders" }
+      }
+    },
+    {
+      "name": "kill-switch-pricing",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/maintenance)",
+        "options": { "routeKey": "pricing" }
+      }
+    },
+    {
+      "name": "kill-switch-dealers",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/maintenance)",
+        "options": { "routeKey": "dealers" }
+      }
+    },
+    {
+      "name": "kill-switch-mcp",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/maintenance)",
+        "options": { "routeKey": "mcp" }
       }
     },
     {

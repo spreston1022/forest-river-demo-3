@@ -3,11 +3,17 @@ import { useAuth, useZudoku } from "zudoku/hooks";
 
 const GATEWAY_URL = import.meta.env.ZUPLO_PUBLIC_SERVER_URL ?? "https://forest-river-demo-main-fb06bf1.zuplo.app";
 
-interface MaintenanceState {
-  enabled: boolean;
-  message: string;
-  enabledAt?: string;
-}
+interface RouteKillState { enabled: boolean; enabledAt?: string; }
+type KillSwitchState = Record<string, RouteKillState>;
+
+const KILL_SWITCH_ROUTES = [
+  { key: "vehicles",  label: "Vehicles API",  routes: "GET /v2/vehicles · GET /v1/vehicles" },
+  { key: "inventory", label: "Inventory API", routes: "GET /v2/inventory · GET /v1/inventory" },
+  { key: "orders",    label: "Orders API",    routes: "GET/POST /v2/orders · GET /v1/orders" },
+  { key: "pricing",   label: "Pricing API",   routes: "GET /v2/pricing" },
+  { key: "dealers",   label: "Dealers API",   routes: "GET /v2/dealers" },
+  { key: "mcp",       label: "MCP Server",    routes: "POST /mcp" },
+] as const;
 
 interface Subscription {
   id: string; planId: string; planName: string;
@@ -209,9 +215,8 @@ export function AdminPage() {
   const [revokeModal, setRevokeModal] = useState<RevokeModalState | null>(null);
 
   // Kill switch state
-  const [maintenanceState, setMaintenanceState] = useState<MaintenanceState | null>(null);
-  const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [togglingMaintenance, setTogglingMaintenance] = useState(false);
+  const [killSwitchState, setKillSwitchState] = useState<KillSwitchState | null>(null);
+  const [togglingKillSwitch, setTogglingKillSwitch] = useState<string | null>(null);
 
   // Announcement state
   const [announcementMessage, setAnnouncementMessage] = useState("");
@@ -246,42 +251,41 @@ export function AdminPage() {
     finally { setLoading(false); }
   }, [auth.isAuthenticated, authFetch]);
 
-  const fetchMaintenance = useCallback(async () => {
+  const fetchKillSwitch = useCallback(async () => {
     if (!auth.isAuthenticated) return;
     try {
       const res = await authFetch(`${GATEWAY_URL}/admin/maintenance`);
-      if (res.ok) setMaintenanceState(await res.json());
+      if (res.ok) setKillSwitchState(await res.json());
     } catch { /* ignore */ }
   }, [auth.isAuthenticated, authFetch]);
 
-  const toggleMaintenance = async (enable: boolean) => {
-    const confirmMsg = enable
-      ? "Enable maintenance mode? All dealer API traffic will immediately receive a 503. Propagates within ~30 seconds."
-      : "Restore traffic? All dealer API requests will resume immediately.";
-    if (!confirm(confirmMsg)) return;
-    setTogglingMaintenance(true);
+  const toggleKillSwitch = async (routeKey: string, enable: boolean) => {
+    const label = KILL_SWITCH_ROUTES.find(r => r.key === routeKey)?.label ?? routeKey;
+    const msg = enable
+      ? `Disable ${label}? All requests to this API will immediately receive a 503. Propagates within ~30 seconds.`
+      : `Restore ${label}? Traffic will resume within ~30 seconds.`;
+    if (!confirm(msg)) return;
+    setTogglingKillSwitch(routeKey);
     try {
       const res = await authFetch(`${GATEWAY_URL}/admin/maintenance`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: enable, message: enable ? maintenanceMessage : "" }),
+        body: JSON.stringify({ routeKey, enabled: enable }),
       });
       if (res.ok) {
-        const state: MaintenanceState = await res.json();
-        setMaintenanceState(state);
-        if (!enable) setMaintenanceMessage("");
-        showToast(enable ? "🔴 Maintenance mode enabled — traffic is blocked" : "✅ Traffic restored", enable ? "error" : "success");
+        setKillSwitchState(await res.json());
+        showToast(enable ? `🔴 ${label} disabled — returning 503` : `✅ ${label} restored`, enable ? "error" : "success");
       } else {
         showToast(`Failed: ${await res.text()}`, "error");
       }
-    } catch { showToast("Error toggling maintenance mode", "error"); }
-    finally { setTogglingMaintenance(false); }
+    } catch { showToast("Error updating kill switch", "error"); }
+    finally { setTogglingKillSwitch(null); }
   };
 
   useEffect(() => { if (auth.isAuthenticated) fetchAll(); }, [auth.isAuthenticated, fetchAll]);
-  useEffect(() => { if (auth.isAuthenticated) fetchMaintenance(); }, [auth.isAuthenticated, fetchMaintenance]);
+  useEffect(() => { if (auth.isAuthenticated) fetchKillSwitch(); }, [auth.isAuthenticated, fetchKillSwitch]);
   useEffect(() => { const i = setInterval(fetchAll, 10000); return () => clearInterval(i); }, [fetchAll]);
-  useEffect(() => { const i = setInterval(fetchMaintenance, 30000); return () => clearInterval(i); }, [fetchMaintenance]);
+  useEffect(() => { const i = setInterval(fetchKillSwitch, 30000); return () => clearInterval(i); }, [fetchKillSwitch]);
 
   const approve = async (sub: Subscription) => {
     setActing(sub.id);
@@ -497,63 +501,38 @@ export function AdminPage() {
       </div>
 
       {/* Kill Switch */}
-      <div className={`rounded-xl border p-6 mb-8 transition-colors ${maintenanceState?.enabled ? "border-red-400 bg-red-50 dark:border-red-700 dark:bg-red-950" : "border-border bg-card"}`}>
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-0.5">
-              API Kill Switch
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${maintenanceState == null ? "bg-muted text-muted-foreground" : maintenanceState.enabled ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"}`}>
-                {maintenanceState == null ? "Loading…" : maintenanceState.enabled ? "🔴 MAINTENANCE" : "🟢 LIVE"}
-              </span>
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {maintenanceState?.enabled
-                ? `All consumer API traffic is blocked — returning 503.${maintenanceState.enabledAt ? ` Active since ${new Date(maintenanceState.enabledAt).toLocaleTimeString()}.` : ""}`
-                : "API is operating normally. Toggle to immediately block all dealer traffic."}
-            </p>
-          </div>
+      <div className="rounded-xl border bg-card p-6 mb-8">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-lg font-bold">API Kill Switch</h2>
+          <p className="text-xs text-muted-foreground">Propagates within ~30 seconds</p>
         </div>
-
-        {maintenanceState?.enabled && maintenanceState.message && (
-          <div className="rounded-lg border border-red-300 bg-red-100 dark:border-red-700 dark:bg-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-200 mb-4 font-mono">
-            "{maintenanceState.message}"
-          </div>
-        )}
-
-        {!maintenanceState?.enabled && (
-          <div className="mb-4 max-w-xl">
-            <label className="block text-sm font-medium mb-1">
-              Custom 503 message <span className="text-muted-foreground font-normal text-xs">(optional — shown in API responses)</span>
-            </label>
-            <input
-              type="text"
-              value={maintenanceMessage}
-              onChange={e => setMaintenanceMessage(e.target.value)}
-              placeholder="The Forest River API is currently undergoing scheduled maintenance. Please try again later."
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-        )}
-
-        <div className="flex items-center gap-4 flex-wrap">
-          {maintenanceState?.enabled ? (
-            <button
-              onClick={() => toggleMaintenance(false)}
-              disabled={togglingMaintenance}
-              className="rounded-lg bg-green-600 text-white px-6 py-2 text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors"
-            >
-              {togglingMaintenance ? "Restoring…" : "✅ Restore Traffic"}
-            </button>
-          ) : (
-            <button
-              onClick={() => toggleMaintenance(true)}
-              disabled={togglingMaintenance || maintenanceState == null}
-              className="rounded-lg bg-red-600 text-white px-6 py-2 text-sm font-semibold hover:bg-red-700 disabled:opacity-60 transition-colors"
-            >
-              {togglingMaintenance ? "Enabling…" : "🔴 Enable Maintenance Mode"}
-            </button>
-          )}
-          <p className="text-xs text-muted-foreground">Propagates to all edge nodes within ~30 seconds</p>
+        <p className="text-sm text-muted-foreground mb-4">Immediately return 503 on individual API routes without affecting others.</p>
+        <div className="space-y-2">
+          {KILL_SWITCH_ROUTES.map(route => {
+            const state = killSwitchState?.[route.key];
+            const enabled = state?.enabled ?? false;
+            const isToggling = togglingKillSwitch === route.key;
+            return (
+              <div key={route.key} className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors ${enabled ? "border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950/50" : "border-border"}`}>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">{route.label}</p>
+                  <p className="text-xs text-muted-foreground">{route.routes}{enabled && state?.enabledAt ? ` · blocked since ${new Date(state.enabledAt).toLocaleTimeString()}` : ""}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 ml-4">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${killSwitchState == null ? "bg-muted text-muted-foreground" : enabled ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"}`}>
+                    {killSwitchState == null ? "…" : enabled ? "🔴 Down" : "🟢 Live"}
+                  </span>
+                  <button
+                    onClick={() => toggleKillSwitch(route.key, !enabled)}
+                    disabled={isToggling || killSwitchState == null}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 whitespace-nowrap ${enabled ? "bg-green-600 text-white hover:bg-green-700" : "border border-red-400 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"}`}
+                  >
+                    {isToggling ? "…" : enabled ? "Restore" : "Disable"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
