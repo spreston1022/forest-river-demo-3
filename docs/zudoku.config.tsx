@@ -2,6 +2,7 @@ import type { ZudokuConfig } from "zudoku";
 import { createApiIdentityPlugin } from "zudoku/plugins";
 import { SubscribePage } from "./SubscribePage";
 import { AdminPage } from "./AdminPage";
+import { SupportPage } from "./SupportPage";
 import { ChatWidget } from "./ChatWidget";
 
 const config: ZudokuConfig = {
@@ -137,6 +138,14 @@ const config: ZudokuConfig = {
       icon: "key",
       element: <SubscribePage view="subscriptions" />,
       display: "always",
+    },
+    {
+      type: "custom-page",
+      path: "/support",
+      label: "Support",
+      icon: "life-buoy",
+      element: <SupportPage />,
+      display: ({ auth }) => auth.isAuthenticated,
     },
     {
       type: "custom-page",

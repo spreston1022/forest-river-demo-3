@@ -339,6 +339,33 @@
         }
       }
     },
+    "/support/ticket": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Submit a support ticket",
+        "operationId": "submit-ticket",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "submitTicket",
+            "module": "$import(./modules/support)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": { "description": "Ticket submitted" },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
     "/admin/maintenance": {
       "x-zuplo-path": {
         "pathMode": "open-api"
