@@ -8,9 +8,9 @@ interface Subscription {
   userId: string; userEmail: string; companyName: string;
   dealerId: string; useCase: string; expectedVolume: string;
   webhookUrl: string; tosAccepted: boolean; tosAcceptedAt: string;
-  status: "pending" | "active" | "rejected";
+  status: "pending" | "active" | "rejected" | "suspended";
   apiKey?: string; requestedAt: string; resolvedAt?: string;
-  portalMessage?: string;
+  portalMessage?: string; portalMessageType?: "info" | "warning" | "success";
 }
 
 const PLANS = [
@@ -26,6 +26,7 @@ function StatusBadge({ status }: { status: string }) {
     pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
     active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
     rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    suspended: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
   };
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${map[status] || ""}`}>{status}</span>;
 }
@@ -33,6 +34,159 @@ function StatusBadge({ status }: { status: string }) {
 function PlanBadge({ planId }: { planId: string }) {
   const plan = PLANS.find(p => p.id === planId);
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${plan?.color || ""}`}>{plan?.name ?? planId}</span>;
+}
+
+interface RevokeModalState {
+  sub: Subscription;
+  step: "choose" | "roll" | "offboard";
+}
+
+function RevokeModal({
+  state,
+  acting,
+  onClose,
+  onSuspend,
+  onRollKey,
+  onOffboard,
+  onStepChange,
+}: {
+  state: RevokeModalState;
+  acting: string | null;
+  onClose: () => void;
+  onSuspend: (sub: Subscription) => void;
+  onRollKey: (sub: Subscription, hours: number) => void;
+  onOffboard: (sub: Subscription) => void;
+  onStepChange: (step: "choose" | "roll" | "offboard") => void;
+}) {
+  const { sub, step } = state;
+  const [gracePeriodHours, setGracePeriodHours] = useState(24);
+  const isActing = acting === sub.id;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-background rounded-xl border shadow-xl w-full max-w-lg">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold">
+              {step === "choose" && `Revoke Access — ${sub.companyName || sub.userEmail}`}
+              {step === "roll" && "Roll API Key"}
+              {step === "offboard" && "Full Offboard"}
+            </h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
+          </div>
+
+          {step === "choose" && (
+            <div className="space-y-3">
+              <div className="rounded-lg border p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-sm">Suspend</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Block API access immediately. Reversible — dealer can be reinstated.</p>
+                  </div>
+                  <button
+                    onClick={() => { onSuspend(sub); onClose(); }}
+                    disabled={isActing}
+                    className="shrink-0 rounded-lg border border-orange-400 text-orange-700 hover:bg-orange-50 px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                  >
+                    {isActing ? "…" : "Suspend"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-sm">Roll Key</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Issue a new key with a grace period. Old key stays valid until expiry.</p>
+                  </div>
+                  <button
+                    onClick={() => onStepChange("roll")}
+                    className="shrink-0 rounded-lg border border-primary text-primary hover:bg-primary/10 px-3 py-1.5 text-xs font-medium transition-colors"
+                  >
+                    Roll Key →
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-red-200 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-sm text-destructive">Full Offboard</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Permanently delete the consumer and all API keys. Irreversible.</p>
+                  </div>
+                  <button
+                    onClick={() => onStepChange("offboard")}
+                    className="shrink-0 rounded-lg border border-destructive/40 text-destructive hover:bg-destructive/10 px-3 py-1.5 text-xs font-medium transition-colors"
+                  >
+                    Offboard →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === "roll" && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                A new API key will be issued for <strong>{sub.companyName || sub.userEmail}</strong>. Their old key remains valid for the grace period below, then is automatically deleted.
+              </p>
+
+              <div>
+                <p className="text-sm font-medium mb-2">Grace period for old key:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 4, 12, 24, 48, 72].map(h => (
+                    <label key={h} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer transition-colors ${gracePeriodHours === h ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:bg-muted"}`}>
+                      <input
+                        type="radio"
+                        name="gracePeriod"
+                        value={h}
+                        checked={gracePeriodHours === h}
+                        onChange={() => setGracePeriodHours(h)}
+                        className="sr-only"
+                      />
+                      {h}h
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => onStepChange("choose")} className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">Back</button>
+                <button
+                  onClick={() => onRollKey(sub, gracePeriodHours)}
+                  disabled={isActing}
+                  className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-60 transition-colors"
+                >
+                  {isActing ? "Rolling…" : `Roll Key (${gracePeriodHours}h grace)`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "offboard" && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950 p-4 text-sm text-red-800 dark:text-red-300">
+                ⚠️ This action is permanent. The consumer and ALL their API keys will be deleted.
+              </div>
+              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 p-4 text-sm text-amber-800 dark:text-amber-300">
+                Note: the dealer's Auth0 portal session remains valid until their JWT expires (up to 24h). In production, also call Auth0's token revocation endpoint for immediate session termination.
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => onStepChange("choose")} className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">Cancel</button>
+                <button
+                  onClick={() => onOffboard(sub)}
+                  disabled={isActing}
+                  className="rounded-lg bg-red-600 text-white px-4 py-2 text-sm font-semibold hover:bg-red-700 disabled:opacity-60 transition-colors"
+                >
+                  {isActing ? "Offboarding…" : "Confirm Full Offboard"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function AdminPage() {
@@ -43,9 +197,10 @@ export function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [filter, setFilter] = useState<"all" | "pending" | "active" | "rejected">("pending");
+  const [filter, setFilter] = useState<"all" | "pending" | "active" | "rejected" | "suspended">("pending");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [movingPlan, setMovingPlan] = useState<Record<string, string>>({});
+  const [revokeModal, setRevokeModal] = useState<RevokeModalState | null>(null);
 
   // Announcement state
   const [announcementMessage, setAnnouncementMessage] = useState("");
@@ -103,6 +258,56 @@ export function AdminPage() {
     finally { setActing(null); }
   };
 
+  const suspend = async (sub: Subscription) => {
+    setActing(sub.id);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/subscriptions/${sub.id}/suspend`, { method: "POST" });
+      if (res.ok) { const u = await res.json(); setSubscriptions(prev => prev.map(s => s.id === u.id ? u : s)); showToast(`⏸️ Suspended ${sub.companyName || sub.userEmail}`); }
+      else showToast(`Failed: ${await res.text()}`, "error");
+    } catch { showToast("Error suspending", "error"); }
+    finally { setActing(null); }
+  };
+
+  const reinstate = async (sub: Subscription) => {
+    setActing(sub.id);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/subscriptions/${sub.id}/reinstate`, { method: "POST" });
+      if (res.ok) { const u = await res.json(); setSubscriptions(prev => prev.map(s => s.id === u.id ? u : s)); showToast(`✅ Reinstated ${sub.companyName || sub.userEmail}`); }
+      else showToast(`Failed: ${await res.text()}`, "error");
+    } catch { showToast("Error reinstating", "error"); }
+    finally { setActing(null); }
+  };
+
+  const rollKey = async (sub: Subscription, gracePeriodHours: number) => {
+    setActing(sub.id);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/subscriptions/${sub.id}/roll-key`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gracePeriodHours }),
+      });
+      if (res.ok) {
+        const u = await res.json();
+        setSubscriptions(prev => prev.map(s => s.id === sub.id ? u : s));
+        showToast(`🔑 Key rolled for ${sub.companyName || sub.userEmail} — old key expires in ${gracePeriodHours}h`);
+        setRevokeModal(null);
+      } else showToast(`Failed: ${await res.text()}`, "error");
+    } catch { showToast("Error rolling key", "error"); }
+    finally { setActing(null); }
+  };
+
+  const offboard = async (sub: Subscription) => {
+    setActing(sub.id);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/subscriptions/${sub.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setSubscriptions(prev => prev.filter(s => s.id !== sub.id));
+        showToast(`🗑️ ${sub.companyName || sub.userEmail} fully offboarded`);
+        setRevokeModal(null);
+      } else showToast(`Failed: ${await res.text()}`, "error");
+    } catch { showToast("Error offboarding", "error"); }
+    finally { setActing(null); }
+  };
+
   const moveToGroup = async (sub: Subscription, newPlanId: string) => {
     if (newPlanId === sub.planId) return;
     const newPlan = PLANS.find(p => p.id === newPlanId);
@@ -140,7 +345,7 @@ export function AdminPage() {
         const result = await res.json();
         showToast(`✅ Announcement published to ${result.updated} consumer${result.updated !== 1 ? "s" : ""}`);
         setAnnouncementMessage("");
-        await fetchAll(); // Refresh to show updated metadata
+        await fetchAll();
       } else {
         showToast(`Failed: ${await res.text()}`, "error");
       }
@@ -207,12 +412,12 @@ export function AdminPage() {
   const filtered = filter === "all" ? subscriptions : subscriptions.filter(s => s.status === filter);
   const pendingCount = subscriptions.filter(s => s.status === "pending").length;
   const activeCount = subscriptions.filter(s => s.status === "active").length;
+  const suspendedCount = subscriptions.filter(s => s.status === "suspended").length;
   const activeByPlan = PLANS.map(plan => ({
     ...plan,
     members: subscriptions.filter(s => s.status === "active" && s.planId === plan.id),
   }));
 
-  // Count consumers with active announcements
   const withAnnouncements = subscriptions.filter(s => s.portalMessage).length;
 
   return (
@@ -223,11 +428,24 @@ export function AdminPage() {
         </div>
       )}
 
+      {revokeModal && (
+        <RevokeModal
+          state={revokeModal}
+          acting={acting}
+          onClose={() => setRevokeModal(null)}
+          onSuspend={suspend}
+          onRollKey={rollKey}
+          onOffboard={offboard}
+          onStepChange={step => setRevokeModal(prev => prev ? { ...prev, step } : null)}
+        />
+      )}
+
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-1">Admin Dashboard</h1>
         <p className="text-muted-foreground text-sm">
           {pendingCount > 0 && <span className="text-yellow-600 dark:text-yellow-400 font-medium">{pendingCount} pending · </span>}
           {activeCount} active consumers
+          {suspendedCount > 0 && <span className="text-orange-600 dark:text-orange-400"> · {suspendedCount} suspended</span>}
           {withAnnouncements > 0 && <span className="text-blue-600 dark:text-blue-400"> · {withAnnouncements} with active announcements</span>}
           {" · "}<button onClick={fetchAll} className="underline hover:no-underline text-primary">Refresh</button>
         </p>
@@ -252,10 +470,11 @@ export function AdminPage() {
       {tab === "requests" && (
         <div>
           <div className="flex gap-2 mb-6">
-            {(["pending", "active", "rejected", "all"] as const).map(f => (
+            {(["pending", "active", "suspended", "rejected", "all"] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors ${filter === f ? "bg-primary text-primary-foreground" : "border border-border hover:bg-muted"}`}>
                 {f}{f === "pending" && pendingCount > 0 && <span className="ml-1 rounded-full bg-white text-primary text-xs px-1">{pendingCount}</span>}
+                {f === "suspended" && suspendedCount > 0 && <span className="ml-1 rounded-full bg-white text-orange-700 text-xs px-1">{suspendedCount}</span>}
               </button>
             ))}
           </div>
@@ -269,7 +488,10 @@ export function AdminPage() {
           ) : (
             <div className="space-y-4">
               {filtered.map(sub => (
-                <div key={sub.id} className={`rounded-xl border bg-card overflow-hidden ${sub.status === "pending" ? "border-yellow-300 dark:border-yellow-700" : ""}`}>
+                <div key={sub.id} className={`rounded-xl border bg-card overflow-hidden ${
+                  sub.status === "pending" ? "border-yellow-300 dark:border-yellow-700" :
+                  sub.status === "suspended" ? "border-orange-300 dark:border-orange-700" : ""
+                }`}>
                   <div className="flex items-start justify-between gap-4 p-6">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -285,7 +507,7 @@ export function AdminPage() {
                         <div><span className="text-muted-foreground">Requested: </span><span className="font-medium">{new Date(sub.requestedAt).toLocaleDateString()}</span></div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                       <button onClick={() => setExpanded(expanded === sub.id ? null : sub.id)}
                         className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors">
                         {expanded === sub.id ? "Less" : "Details"}
@@ -301,6 +523,18 @@ export function AdminPage() {
                             {acting === sub.id ? "…" : "Reject"}
                           </button>
                         </>
+                      )}
+                      {sub.status === "active" && (
+                        <button onClick={() => setRevokeModal({ sub, step: "choose" })}
+                          className="rounded-lg border border-orange-400 text-orange-700 hover:bg-orange-50 px-4 py-2 text-sm font-semibold transition-colors">
+                          Revoke →
+                        </button>
+                      )}
+                      {sub.status === "suspended" && (
+                        <button onClick={() => reinstate(sub)} disabled={acting === sub.id}
+                          className="rounded-lg bg-green-600 text-white px-4 py-2 text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors">
+                          {acting === sub.id ? "…" : "Reinstate"}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -391,6 +625,12 @@ export function AdminPage() {
                           >
                             {acting === sub.id ? "…" : "Apply"}
                           </button>
+                          <button
+                            onClick={() => setRevokeModal({ sub, step: "choose" })}
+                            className="rounded-lg border border-orange-400 text-orange-700 hover:bg-orange-50 px-3 py-1.5 text-xs font-medium transition-colors"
+                          >
+                            Revoke →
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -399,6 +639,36 @@ export function AdminPage() {
               </div>
             ))}
           </div>
+
+          {/* Suspended consumers section */}
+          {suspendedCount > 0 && (
+            <div className="mt-8">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">Suspended</span>
+                <h2 className="font-semibold">Suspended Consumers</h2>
+              </div>
+              <div className="space-y-2">
+                {subscriptions.filter(s => s.status === "suspended").map(sub => (
+                  <div key={sub.id} className="rounded-xl border border-orange-300 dark:border-orange-700 bg-card p-4 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-medium">{sub.companyName || sub.userEmail}</p>
+                        <PlanBadge planId={sub.planId} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">{sub.userEmail}</p>
+                    </div>
+                    <button
+                      onClick={() => reinstate(sub)}
+                      disabled={acting === sub.id}
+                      className="shrink-0 rounded-lg bg-green-600 text-white px-3 py-1.5 text-xs font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors"
+                    >
+                      {acting === sub.id ? "…" : "Reinstate"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

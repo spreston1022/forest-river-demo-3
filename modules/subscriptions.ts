@@ -122,6 +122,42 @@ async function zuploPatch(path: string, body: unknown) {
   return res.json();
 }
 
+async function zuploDelete(path: string) {
+  const res = await fetch(`${BASE}/${bucket()}${path}`, { method: "DELETE", headers: zuploHeaders() });
+  if (!res.ok && res.status !== 404) throw new Error(`Zuplo DELETE ${path} failed: ${await res.text()}`);
+}
+
+function keyRollHtml(companyName: string, planName: string, newKey: string, oldKeyExpiry: string): string {
+  const expiry = new Date(oldKeyExpiry).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" });
+  return "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
+    + "<div style='background:#026957;padding:24px;margin-bottom:24px'><h1 style='color:#fff;margin:0;font-size:20px'>Forest River Developer Portal</h1></div>"
+    + "<h2 style='color:#026957'>Your API Key Has Been Rolled</h2>"
+    + "<p>Hi " + companyName + ",</p>"
+    + "<p>Your <strong>" + planName + " Plan</strong> API key has been rolled. Your new key is below.</p>"
+    + "<div style='background:#f0f7f5;border-left:4px solid #026957;padding:16px;margin:24px 0'>"
+    + "<p style='margin:0 0 8px 0;font-size:12px;color:#666;text-transform:uppercase'>New API Key</p>"
+    + "<code style='font-family:monospace;font-size:14px;color:#026957;word-break:break-all'>" + newKey + "</code></div>"
+    + "<div style='background:#fff8e1;border-left:4px solid #f59e0b;padding:16px;margin:24px 0'>"
+    + "<p style='margin:0;font-size:13px;color:#92400e'>⚠️ <strong>Your old key expires " + expiry + ".</strong> Both keys work until then. Update your integration before this deadline.</p></div>"
+    + "<p>Include your new key in every request: <code>Authorization: Bearer " + newKey + "</code></p>"
+    + "<p><a href='" + PORTAL_URL + "/my-subscriptions' style='display:inline-block;background:#026957;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold'>View My Subscriptions</a></p>"
+    + "<hr style='border:none;border-top:1px solid #e2e2e2;margin:24px 0'/>"
+    + "<p style='font-size:12px;color:#666'>Questions? Visit the <a href='" + PORTAL_URL + "' style='color:#026957'>Forest River Developer Portal</a></p>"
+    + "</body></html>";
+}
+
+function offboardHtml(companyName: string, planName: string): string {
+  return "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
+    + "<div style='background:#026957;padding:24px;margin-bottom:24px'><h1 style='color:#fff;margin:0;font-size:20px'>Forest River Developer Portal</h1></div>"
+    + "<h2>Forest River API Access Terminated</h2>"
+    + "<p>Hi " + companyName + ",</p>"
+    + "<p>Your <strong>" + planName + " Plan</strong> API access has been permanently revoked. All API keys associated with your account have been deleted and will no longer function.</p>"
+    + "<p>If you believe this was an error, please contact your Forest River integration representative.</p>"
+    + "<hr style='border:none;border-top:1px solid #e2e2e2;margin:24px 0'/>"
+    + "<p style='font-size:12px;color:#666'>Forest River, Inc. — API Program</p>"
+    + "</body></html>";
+}
+
 // ─── Consumer helpers ─────────────────────────────────────────────────────────
 
 interface ZuploConsumer {
@@ -158,7 +194,7 @@ function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
     webhookUrl: c.metadata?.["webhookUrl"] ?? "",
     tosAccepted: c.metadata?.["tosAccepted"] === "true",
     tosAcceptedAt: c.metadata?.["tosAcceptedAt"] ?? "",
-    status: c.tags?.["status"] ?? "pending",
+    status: (c.tags?.["status"] ?? "pending") as string,
     apiKey,
     requestedAt: c.metadata?.["requestedAt"] ?? new Date().toISOString(),
     resolvedAt: c.metadata?.["resolvedAt"],
@@ -327,6 +363,97 @@ export async function adminAnnounceToConsumer(request: ZuploRequest, context: Zu
     metadata: { ...existing.metadata, portalMessage: body.message, portalMessageType: body.type, portalMessageAt: body.message ? new Date().toISOString() : "" },
   }) as ZuploConsumer;
   return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/** POST /admin/subscriptions/:id/suspend */
+export async function adminSuspendSubscription(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  const consumerName = request.params.id;
+  const existing = await getConsumerWithKey(consumerName);
+  const updated = await zuploPatch(`/consumers/${consumerName}`, {
+    tags: { ...existing.tags, status: "suspended" },
+    metadata: { ...existing.metadata, suspendedAt: new Date().toISOString() },
+  }) as ZuploConsumer;
+  return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/** POST /admin/subscriptions/:id/reinstate */
+export async function adminReinstateSubscription(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  const consumerName = request.params.id;
+  const existing = await getConsumerWithKey(consumerName);
+  const updated = await zuploPatch(`/consumers/${consumerName}`, {
+    tags: { ...existing.tags, status: "active" },
+    metadata: { ...existing.metadata, reinstatedAt: new Date().toISOString() },
+  }) as ZuploConsumer;
+  return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/** POST /admin/subscriptions/:id/roll-key  body: { gracePeriodHours?: number } */
+export async function adminRollKey(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  const consumerName = request.params.id;
+  const body = await request.json() as { gracePeriodHours?: number };
+  const gracePeriodHours = body.gracePeriodHours ?? 24;
+  const oldKeyExpiry = new Date(Date.now() + gracePeriodHours * 60 * 60 * 1000).toISOString();
+
+  const existing = await getConsumerWithKey(consumerName);
+  const oldKeyId = existing.apiKeys?.[0]?.id ?? "";
+
+  const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Rolled key — " + new Date().toISOString() }) as { key: string; id: string };
+
+  const updated = await zuploPatch(`/consumers/${consumerName}`, {
+    tags: { ...existing.tags, oldKeyId, oldKeyExpiry },
+    metadata: { ...existing.metadata, keyRolledAt: new Date().toISOString() },
+  }) as ZuploConsumer;
+
+  const email = existing.metadata?.["email"] ?? "";
+  const company = existing.metadata?.["companyName"] || email || "Dealer";
+  const plan = existing.metadata?.["planName"] ?? "API";
+  if (email) context.waitUntil(sendEmail(email, "Your Forest River API Key Has Been Rolled", keyRollHtml(company, plan, keyData.key, oldKeyExpiry), context));
+
+  return new Response(JSON.stringify({ ...consumerToSubscription(updated), newApiKey: keyData.key, oldKeyExpiry }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/** DELETE /admin/subscriptions/:id  — full offboard */
+export async function adminOffboardSubscription(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  const consumerName = request.params.id;
+  const existing = await getConsumerWithKey(consumerName);
+  await zuploDelete(`/consumers/${consumerName}`);
+  const email = existing.metadata?.["email"] ?? "";
+  const company = existing.metadata?.["companyName"] || email || "Dealer";
+  const plan = existing.metadata?.["planName"] ?? "API";
+  if (email) context.waitUntil(sendEmail(email, "Your Forest River API Access Has Been Terminated", offboardHtml(company, plan), context));
+  return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/** POST /subscriptions/roll-key  body: { subscriptionId: string } — consumer self-service */
+export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  const userId = request.user.sub!;
+  const body = await request.json() as { subscriptionId: string };
+  const consumerName = body.subscriptionId;
+  const existing = await getConsumerWithKey(consumerName);
+  if (existing.metadata?.["userId"] !== userId) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+  if (existing.tags?.["status"] !== "active") return new Response(JSON.stringify({ error: "Subscription not active" }), { status: 400 });
+
+  const oldKeyId = existing.apiKeys?.[0]?.id ?? "";
+  const gracePeriodHours = 1;
+  const oldKeyExpiry = new Date(Date.now() + gracePeriodHours * 60 * 60 * 1000).toISOString();
+
+  const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Self-rolled key — " + new Date().toISOString() }) as { key: string; id: string };
+  await zuploPatch(`/consumers/${consumerName}`, {
+    tags: { ...existing.tags, oldKeyId, oldKeyExpiry },
+    metadata: { ...existing.metadata, keyRolledAt: new Date().toISOString() },
+  });
+
+  const email = existing.metadata?.["email"] ?? "";
+  const company = existing.metadata?.["companyName"] || email || "Dealer";
+  const plan = existing.metadata?.["planName"] ?? "API";
+  if (email) context.waitUntil(sendEmail(email, "Your Forest River API Key Has Been Rolled", keyRollHtml(company, plan, keyData.key, oldKeyExpiry), context));
+
+  return new Response(JSON.stringify({ apiKey: keyData.key, oldKeyExpiry }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
 /** POST /admin/email */
