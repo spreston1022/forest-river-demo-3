@@ -327,6 +327,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
           webhookUrl: fields.webhookUrl,
           tosAccepted: fields.tosAccepted, tosAcceptedAt: new Date().toISOString(),
           turnstileToken,
+          userEmail: (auth.profile as any)?.email ?? "",
         }),
       });
       if (!res.ok) throw new Error(await res.text());
