@@ -30,6 +30,7 @@
             "inbound": [
               "v1-sunset-inbound",
               "v1-brownout-inbound",
+              "maintenance-mode-inbound",
               "api-key-inbound",
               "revocation-check-inbound",
               "plan-rate-limit-inbound",
@@ -130,6 +131,7 @@
             "inbound": [
               "v1-sunset-inbound",
               "v1-brownout-inbound",
+              "maintenance-mode-inbound",
               "api-key-inbound",
               "revocation-check-inbound",
               "plan-rate-limit-inbound",
@@ -216,6 +218,7 @@
             "inbound": [
               "v1-sunset-inbound",
               "v1-brownout-inbound",
+              "maintenance-mode-inbound",
               "api-key-inbound",
               "revocation-check-inbound",
               "plan-rate-limit-inbound",

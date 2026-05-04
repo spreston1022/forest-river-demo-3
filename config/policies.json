@@ -34,6 +34,14 @@
       }
     },
     {
+      "name": "maintenance-mode-inbound",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/maintenance)"
+      }
+    },
+    {
       "name": "revocation-check-inbound",
       "policyType": "custom-code-inbound",
       "handler": {

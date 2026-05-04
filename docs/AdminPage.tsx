@@ -3,6 +3,12 @@ import { useAuth, useZudoku } from "zudoku/hooks";
 
 const GATEWAY_URL = import.meta.env.ZUPLO_PUBLIC_SERVER_URL ?? "https://forest-river-demo-main-fb06bf1.zuplo.app";
 
+interface MaintenanceState {
+  enabled: boolean;
+  message: string;
+  enabledAt?: string;
+}
+
 interface Subscription {
   id: string; planId: string; planName: string;
   userId: string; userEmail: string; companyName: string;
@@ -202,6 +208,11 @@ export function AdminPage() {
   const [movingPlan, setMovingPlan] = useState<Record<string, string>>({});
   const [revokeModal, setRevokeModal] = useState<RevokeModalState | null>(null);
 
+  // Kill switch state
+  const [maintenanceState, setMaintenanceState] = useState<MaintenanceState | null>(null);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [togglingMaintenance, setTogglingMaintenance] = useState(false);
+
   // Announcement state
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [announcementTarget, setAnnouncementTarget] = useState<"all" | "basic" | "pro" | "enterprise">("all");
@@ -235,8 +246,42 @@ export function AdminPage() {
     finally { setLoading(false); }
   }, [auth.isAuthenticated, authFetch]);
 
+  const fetchMaintenance = useCallback(async () => {
+    if (!auth.isAuthenticated) return;
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/maintenance`);
+      if (res.ok) setMaintenanceState(await res.json());
+    } catch { /* ignore */ }
+  }, [auth.isAuthenticated, authFetch]);
+
+  const toggleMaintenance = async (enable: boolean) => {
+    const confirmMsg = enable
+      ? "Enable maintenance mode? All dealer API traffic will immediately receive a 503. Propagates within ~30 seconds."
+      : "Restore traffic? All dealer API requests will resume immediately.";
+    if (!confirm(confirmMsg)) return;
+    setTogglingMaintenance(true);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/admin/maintenance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: enable, message: enable ? maintenanceMessage : "" }),
+      });
+      if (res.ok) {
+        const state: MaintenanceState = await res.json();
+        setMaintenanceState(state);
+        if (!enable) setMaintenanceMessage("");
+        showToast(enable ? "🔴 Maintenance mode enabled — traffic is blocked" : "✅ Traffic restored", enable ? "error" : "success");
+      } else {
+        showToast(`Failed: ${await res.text()}`, "error");
+      }
+    } catch { showToast("Error toggling maintenance mode", "error"); }
+    finally { setTogglingMaintenance(false); }
+  };
+
   useEffect(() => { if (auth.isAuthenticated) fetchAll(); }, [auth.isAuthenticated, fetchAll]);
+  useEffect(() => { if (auth.isAuthenticated) fetchMaintenance(); }, [auth.isAuthenticated, fetchMaintenance]);
   useEffect(() => { const i = setInterval(fetchAll, 10000); return () => clearInterval(i); }, [fetchAll]);
+  useEffect(() => { const i = setInterval(fetchMaintenance, 30000); return () => clearInterval(i); }, [fetchMaintenance]);
 
   const approve = async (sub: Subscription) => {
     setActing(sub.id);
@@ -449,6 +494,67 @@ export function AdminPage() {
           {withAnnouncements > 0 && <span className="text-blue-600 dark:text-blue-400"> · {withAnnouncements} with active announcements</span>}
           {" · "}<button onClick={fetchAll} className="underline hover:no-underline text-primary">Refresh</button>
         </p>
+      </div>
+
+      {/* Kill Switch */}
+      <div className={`rounded-xl border p-6 mb-8 transition-colors ${maintenanceState?.enabled ? "border-red-400 bg-red-50 dark:border-red-700 dark:bg-red-950" : "border-border bg-card"}`}>
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-0.5">
+              API Kill Switch
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${maintenanceState == null ? "bg-muted text-muted-foreground" : maintenanceState.enabled ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300" : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"}`}>
+                {maintenanceState == null ? "Loading…" : maintenanceState.enabled ? "🔴 MAINTENANCE" : "🟢 LIVE"}
+              </span>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {maintenanceState?.enabled
+                ? `All consumer API traffic is blocked — returning 503.${maintenanceState.enabledAt ? ` Active since ${new Date(maintenanceState.enabledAt).toLocaleTimeString()}.` : ""}`
+                : "API is operating normally. Toggle to immediately block all dealer traffic."}
+            </p>
+          </div>
+        </div>
+
+        {maintenanceState?.enabled && maintenanceState.message && (
+          <div className="rounded-lg border border-red-300 bg-red-100 dark:border-red-700 dark:bg-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-200 mb-4 font-mono">
+            "{maintenanceState.message}"
+          </div>
+        )}
+
+        {!maintenanceState?.enabled && (
+          <div className="mb-4 max-w-xl">
+            <label className="block text-sm font-medium mb-1">
+              Custom 503 message <span className="text-muted-foreground font-normal text-xs">(optional — shown in API responses)</span>
+            </label>
+            <input
+              type="text"
+              value={maintenanceMessage}
+              onChange={e => setMaintenanceMessage(e.target.value)}
+              placeholder="The Forest River API is currently undergoing scheduled maintenance. Please try again later."
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        )}
+
+        <div className="flex items-center gap-4 flex-wrap">
+          {maintenanceState?.enabled ? (
+            <button
+              onClick={() => toggleMaintenance(false)}
+              disabled={togglingMaintenance}
+              className="rounded-lg bg-green-600 text-white px-6 py-2 text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors"
+            >
+              {togglingMaintenance ? "Restoring…" : "✅ Restore Traffic"}
+            </button>
+          ) : (
+            <button
+              onClick={() => toggleMaintenance(true)}
+              disabled={togglingMaintenance || maintenanceState == null}
+              className="rounded-lg bg-red-600 text-white px-6 py-2 text-sm font-semibold hover:bg-red-700 disabled:opacity-60 transition-colors"
+            >
+              {togglingMaintenance ? "Enabling…" : "🔴 Enable Maintenance Mode"}
+            </button>
+          )}
+          <p className="text-xs text-muted-foreground">Propagates to all edge nodes within ~30 seconds</p>
+        </div>
       </div>
 
       {/* Tabs */}
