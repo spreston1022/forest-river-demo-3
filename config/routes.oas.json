@@ -398,6 +398,190 @@
           }
         }
       }
+    },
+    "/admin/subscriptions/{id}/suspend": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Admin \u2014 suspend subscription",
+        "operationId": "admin-suspend-subscription",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminSuspendSubscription",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription suspended"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/admin/subscriptions/{id}/reinstate": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Admin \u2014 reinstate subscription",
+        "operationId": "admin-reinstate-subscription",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminReinstateSubscription",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription reinstated"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/admin/subscriptions/{id}/roll-key": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Admin \u2014 roll consumer API key with grace period",
+        "operationId": "admin-roll-key",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminRollKey",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Key rolled and new key provisioned"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/admin/subscriptions/{id}": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "delete": {
+        "summary": "Admin \u2014 fully offboard a consumer",
+        "operationId": "admin-offboard-subscription",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminOffboardSubscription",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consumer deleted and offboarding email sent"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/subscriptions/roll-key": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Roll my API key",
+        "operationId": "roll-my-key",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "rollMyKey",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New key provisioned with 1-hour grace period on old key"
+          },
+          "400": {
+            "description": "Subscription not active"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
     }
   }
 }

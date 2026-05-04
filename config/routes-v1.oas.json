@@ -3,7 +3,7 @@
   "info": {
     "title": "Forest River API (v1)",
     "version": "1.0.0",
-    "description": "⚠️ **This version is deprecated.** Please migrate to v2 before **May 30, 2026**.\n\n**Breaking changes in v2:**\n- `dealerCode` (string) replaced by `dealerId` (UUID) — dealer system migration\n- New `category` field added to vehicles: Camping, Work & Play, Marine, Specialty\n\nSee the [Migration Guide](/migration-guide) for full details."
+    "description": "\u26a0\ufe0f **This version is deprecated.** Please migrate to v2 before **May 30, 2026**.\n\n**Breaking changes in v2:**\n- `dealerCode` (string) replaced by `dealerId` (UUID) \u2014 dealer system migration\n- New `category` field added to vehicles: Camping, Work & Play, Marine, Specialty\n\nSee the [Migration Guide](/migration-guide) for full details."
   },
   "paths": {
     "/v1/vehicles": {
@@ -12,7 +12,7 @@
       },
       "get": {
         "summary": "List vehicles",
-        "description": "**Deprecated.** Returns the Forest River product catalog. Migrate to `/v2/vehicles` — the response schema has changed.",
+        "description": "**Deprecated.** Returns the Forest River product catalog. Migrate to `/v2/vehicles` \u2014 the response schema has changed.",
         "operationId": "v1-list-vehicles",
         "tags": [
           "Vehicles"
@@ -31,6 +31,7 @@
               "v1-sunset-inbound",
               "v1-brownout-inbound",
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ],
@@ -41,7 +42,7 @@
         },
         "responses": {
           "200": {
-            "description": "Vehicle list (v1 schema — note: missing `category`, uses `dealerCode` not `dealerId`)",
+            "description": "Vehicle list (v1 schema \u2014 note: missing `category`, uses `dealerCode` not `dealerId`)",
             "content": {
               "application/json": {
                 "examples": {
@@ -94,13 +95,13 @@
             "description": "Unauthorized"
           },
           "410": {
-            "description": "Gone — v1 has been retired"
+            "description": "Gone \u2014 v1 has been retired"
           },
           "429": {
             "description": "Rate limit exceeded"
           },
           "503": {
-            "description": "Brownout — v1 retiring May 30, 2026"
+            "description": "Brownout \u2014 v1 retiring May 30, 2026"
           }
         }
       }
@@ -130,6 +131,7 @@
               "v1-sunset-inbound",
               "v1-brownout-inbound",
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ],
@@ -140,7 +142,7 @@
         },
         "responses": {
           "200": {
-            "description": "Inventory (v1 schema — uses `dealerCode`)",
+            "description": "Inventory (v1 schema \u2014 uses `dealerCode`)",
             "content": {
               "application/json": {
                 "examples": {
@@ -179,7 +181,7 @@
             "description": "Unauthorized"
           },
           "410": {
-            "description": "Gone — v1 retired"
+            "description": "Gone \u2014 v1 retired"
           },
           "429": {
             "description": "Rate limit exceeded"
@@ -215,6 +217,7 @@
               "v1-sunset-inbound",
               "v1-brownout-inbound",
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ],
@@ -250,7 +253,7 @@
             "description": "Unauthorized"
           },
           "410": {
-            "description": "Gone — v1 retired"
+            "description": "Gone \u2014 v1 retired"
           },
           "429": {
             "description": "Rate limit exceeded"

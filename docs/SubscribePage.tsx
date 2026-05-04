@@ -22,8 +22,9 @@ interface Subscription {
   id: string;
   planId: "basic" | "pro" | "enterprise";
   planName: string;
-  status: "pending" | "active" | "rejected";
+  status: "pending" | "active" | "rejected" | "suspended";
   apiKey?: string;
+  oldKeyExpiry?: string;
   requestedAt: string;
   resolvedAt?: string;
   companyName?: string;
@@ -261,6 +262,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   const [modalPlan, setModalPlan] = useState<Plan | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
+  const [rollingKey, setRollingKey] = useState<string | null>(null);
   const auth = useAuth();
   const { authentication } = useZudoku();
 
@@ -339,6 +341,23 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
     } finally { setSubmitting(false); }
   };
 
+  const handleRollKey = async (sub: Subscription) => {
+    if (!confirm("Roll your API key? Both your old and new keys will work for 1 hour, then the old one stops working.")) return;
+    setRollingKey(sub.id);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/subscriptions/roll-key`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscriptionId: sub.id }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, apiKey: data.apiKey, oldKeyExpiry: data.oldKeyExpiry } : s));
+      showToast("🔑 Key rolled! Your new key is shown below. Old key valid for 1 hour.", "success");
+    } catch (err: any) {
+      showToast(`Failed to roll key: ${err.message}`, "error");
+    } finally { setRollingKey(null); }
+  };
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -400,6 +419,11 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                       <span className="animate-pulse">⏳</span> Pending admin approval…
                     </div>
                   )}
+                  {sub?.status === "suspended" && (
+                    <div className="flex items-center justify-center gap-2 rounded-lg border border-orange-400 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-800 dark:border-orange-600 dark:bg-orange-950 dark:text-orange-300">
+                      ⏸️ Access suspended
+                    </div>
+                  )}
                   {sub?.status === "active" && (
                     <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
                       <p className="mb-1 text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted</p>
@@ -458,8 +482,12 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold text-lg">{sub.planName}</h3>
                           {sub.companyName && <span className="text-muted-foreground text-sm">— {sub.companyName}</span>}
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"}`}>
-                            {sub.status === "active" ? "Active" : "Pending"}
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
+                            sub.status === "suspended" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300" :
+                            "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+                          }`}>
+                            {sub.status === "active" ? "Active" : sub.status === "suspended" ? "Suspended" : "Pending"}
                           </span>
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
@@ -471,12 +499,31 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                           <div><dt className="text-muted-foreground">Requested</dt><dd className="font-medium">{new Date(sub.requestedAt).toLocaleDateString()}</dd></div>
                         </dl>
                         {sub.status === "active" && sub.apiKey && (
-                          <div className="mt-4 rounded-lg border bg-muted/50 p-3">
-                            <p className="mb-1 text-xs font-medium text-muted-foreground">API Key</p>
-                            <div className="flex items-center">
-                              <code className="flex-1 truncate text-sm font-mono">{sub.apiKey}</code>
-                              <CopyButton text={sub.apiKey} />
+                          <div className="mt-4 space-y-2">
+                            <div className="rounded-lg border bg-muted/50 p-3">
+                              <p className="mb-1 text-xs font-medium text-muted-foreground">Current API Key</p>
+                              <div className="flex items-center">
+                                <code className="flex-1 truncate text-sm font-mono">{sub.apiKey}</code>
+                                <CopyButton text={sub.apiKey} />
+                                <button
+                                  onClick={() => handleRollKey(sub)}
+                                  disabled={rollingKey === sub.id}
+                                  className="border text-xs px-2 py-0.5 rounded hover:bg-muted transition-colors ml-2 disabled:opacity-60"
+                                >
+                                  {rollingKey === sub.id ? "Rolling…" : "Roll Key"}
+                                </button>
+                              </div>
                             </div>
+                            {sub.oldKeyExpiry && new Date(sub.oldKeyExpiry) > new Date() && (
+                              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                                ⚠️ <strong>Previous key expires</strong> {new Date(sub.oldKeyExpiry).toLocaleString()} — update your integration before then.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {sub.status === "suspended" && (
+                          <div className="mt-4 flex items-center gap-2 text-sm text-orange-700 dark:text-orange-400 rounded-lg border border-orange-300 bg-orange-50 dark:border-orange-700 dark:bg-orange-950 px-3 py-2">
+                            ⏸️ Your API access has been suspended. Contact your Forest River representative.
                           </div>
                         )}
                         {sub.status === "pending" && (

@@ -61,6 +61,7 @@
           "policies": {
             "inbound": [
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -292,6 +293,7 @@
           "policies": {
             "inbound": [
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -437,6 +439,7 @@
           "policies": {
             "inbound": [
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -605,6 +608,7 @@
           "policies": {
             "inbound": [
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -692,6 +696,7 @@
           "policies": {
             "inbound": [
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -780,6 +785,7 @@
           "policies": {
             "inbound": [
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -889,6 +895,7 @@
           "policies": {
             "inbound": [
               "api-key-inbound",
+              "revocation-check-inbound",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -1026,7 +1033,8 @@
           "policies": {
             "inbound": [
               "mcp-query-param-to-header-inbound",
-              "api-key-inbound"
+              "api-key-inbound",
+              "revocation-check-inbound"
             ]
           }
         },
