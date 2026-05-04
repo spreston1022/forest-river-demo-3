@@ -196,6 +196,7 @@ function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
     tosAcceptedAt: c.metadata?.["tosAcceptedAt"] ?? "",
     status: (c.tags?.["status"] ?? "pending") as string,
     apiKey,
+    oldKeyExpiry: c.tags?.["oldKeyExpiry"] ?? "",
     requestedAt: c.metadata?.["requestedAt"] ?? new Date().toISOString(),
     resolvedAt: c.metadata?.["resolvedAt"],
     portalMessage: c.metadata?.["portalMessage"] ?? "",

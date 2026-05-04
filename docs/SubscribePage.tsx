@@ -24,6 +24,7 @@ interface Subscription {
   planName: string;
   status: "pending" | "active" | "rejected" | "suspended";
   apiKey?: string;
+  oldKeyExpiry?: string;
   requestedAt: string;
   resolvedAt?: string;
   companyName?: string;
@@ -350,7 +351,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, apiKey: data.apiKey } : s));
+      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, apiKey: data.apiKey, oldKeyExpiry: data.oldKeyExpiry } : s));
       showToast("🔑 Key rolled! Your new key is shown below. Old key valid for 1 hour.", "success");
     } catch (err: any) {
       showToast(`Failed to roll key: ${err.message}`, "error");
@@ -498,19 +499,26 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                           <div><dt className="text-muted-foreground">Requested</dt><dd className="font-medium">{new Date(sub.requestedAt).toLocaleDateString()}</dd></div>
                         </dl>
                         {sub.status === "active" && sub.apiKey && (
-                          <div className="mt-4 rounded-lg border bg-muted/50 p-3">
-                            <p className="mb-1 text-xs font-medium text-muted-foreground">API Key</p>
-                            <div className="flex items-center">
-                              <code className="flex-1 truncate text-sm font-mono">{sub.apiKey}</code>
-                              <CopyButton text={sub.apiKey} />
-                              <button
-                                onClick={() => handleRollKey(sub)}
-                                disabled={rollingKey === sub.id}
-                                className="border text-xs px-2 py-0.5 rounded hover:bg-muted transition-colors ml-2 disabled:opacity-60"
-                              >
-                                {rollingKey === sub.id ? "Rolling…" : "Roll Key"}
-                              </button>
+                          <div className="mt-4 space-y-2">
+                            <div className="rounded-lg border bg-muted/50 p-3">
+                              <p className="mb-1 text-xs font-medium text-muted-foreground">Current API Key</p>
+                              <div className="flex items-center">
+                                <code className="flex-1 truncate text-sm font-mono">{sub.apiKey}</code>
+                                <CopyButton text={sub.apiKey} />
+                                <button
+                                  onClick={() => handleRollKey(sub)}
+                                  disabled={rollingKey === sub.id}
+                                  className="border text-xs px-2 py-0.5 rounded hover:bg-muted transition-colors ml-2 disabled:opacity-60"
+                                >
+                                  {rollingKey === sub.id ? "Rolling…" : "Roll Key"}
+                                </button>
+                              </div>
                             </div>
+                            {sub.oldKeyExpiry && new Date(sub.oldKeyExpiry) > new Date() && (
+                              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                                ⚠️ <strong>Previous key expires</strong> {new Date(sub.oldKeyExpiry).toLocaleString()} — update your integration before then.
+                              </div>
+                            )}
                           </div>
                         )}
                         {sub.status === "suspended" && (
