@@ -4,8 +4,6 @@ sidebar_label: Migration Guide
 sidebar_icon: alert-triangle
 ---
 
-# API v1 Deprecation & Migration Guide
-
 :::danger{title="⚠️ API v1 Retiring May 30, 2026"}
 Forest River API v1 will be permanently retired on **May 30, 2026**. All integrations must migrate to v2 before this date. After sunset, v1 requests will return `410 Gone`.
 :::
