@@ -215,7 +215,7 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     companyName?: string; dealerId?: string; useCase?: string;
     expectedVolume?: string; webhookUrl?: string;
     tosAccepted?: boolean; tosAcceptedAt?: string;
-    turnstileToken?: string;
+    turnstileToken?: string; userEmail?: string;
   };
 
   if (body.turnstileToken) {
@@ -228,7 +228,7 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
   }
 
   const userId = request.user.sub!;
-  const userEmail = await getUserEmail(request);
+  const userEmail = (await getUserEmail(request)) || body.userEmail || "";
   const consumerName = subToConsumerName(userId, body.planId);
 
   try {
@@ -298,7 +298,7 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
   const email = existing.metadata?.["email"] ?? "";
   const company = existing.metadata?.["companyName"] || email || "Dealer";
   const plan = existing.metadata?.["planName"] ?? "API";
-  context.waitUntil(sendEmail(email, "Your " + plan + " API Access is Approved", approvalHtml(company, plan, keyData.key), context));
+  if (email) context.waitUntil(sendEmail(email, "Your " + plan + " API Access is Approved", approvalHtml(company, plan, keyData.key), context));
   return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
@@ -314,7 +314,7 @@ export async function adminRejectSubscription(request: ZuploRequest, context: Zu
   const email = existing.metadata?.["email"] ?? "";
   const company = existing.metadata?.["companyName"] || email || "Dealer";
   const plan = existing.metadata?.["planName"] ?? "API";
-  context.waitUntil(sendEmail(email, "Update on Your " + plan + " API Access Request", rejectionHtml(company, plan), context));
+  if (email) context.waitUntil(sendEmail(email, "Update on Your " + plan + " API Access Request", rejectionHtml(company, plan), context));
   return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
