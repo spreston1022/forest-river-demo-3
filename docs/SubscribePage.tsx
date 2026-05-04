@@ -50,6 +50,21 @@ const PLANS: Plan[] = [
 const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoting", "Reporting & analytics", "Customer portal integration", "Other"];
 const VOLUME_OPTIONS = ["< 10,000 / month", "10,000 – 100,000 / month", "100,000 – 1,000,000 / month", "> 1,000,000 / month"];
 
+function MaskedKey({ value }: { value: string }) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <span className="flex items-center gap-1 flex-1 min-w-0">
+      <code className="flex-1 truncate text-sm font-mono">
+        {revealed ? value : "•".repeat(Math.min(value.length, 32))}
+      </code>
+      <button onClick={() => setRevealed(r => !r)}
+        className="ml-1 rounded px-2 py-0.5 text-xs font-medium border border-current opacity-70 hover:opacity-100 transition-opacity whitespace-nowrap">
+        {revealed ? "Hide" : "Reveal"}
+      </button>
+    </span>
+  );
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -427,11 +442,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                   )}
                   {sub?.status === "active" && (
                     <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
-                      <p className="mb-1 text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted</p>
-                      <div className="flex items-center">
-                        <code className="flex-1 truncate rounded text-xs font-mono text-green-900 dark:text-green-200">{sub.apiKey}</code>
-                        {sub.apiKey && <CopyButton text={sub.apiKey} />}
-                      </div>
+                      <p className="text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted — view your key in My Subscriptions</p>
                     </div>
                   )}
                 </div>
@@ -495,7 +506,6 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                           {plan && <>
                             <div><dt className="text-muted-foreground">Rate limit</dt><dd className="font-medium">{plan.rateLimit}</dd></div>
                             <div><dt className="text-muted-foreground">Monthly quota</dt><dd className="font-medium">{plan.monthlyQuota}</dd></div>
-                            <div><dt className="text-muted-foreground">SLA</dt><dd className="font-medium">{plan.sla}</dd></div>
                           </>}
                           <div><dt className="text-muted-foreground">Requested</dt><dd className="font-medium">{new Date(sub.requestedAt).toLocaleDateString()}</dd></div>
                         </dl>
@@ -504,7 +514,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                             <div className="rounded-lg border bg-muted/50 p-3">
                               <p className="mb-1 text-xs font-medium text-muted-foreground">Current API Key</p>
                               <div className="flex items-center">
-                                <code className="flex-1 truncate text-sm font-mono">{sub.apiKey}</code>
+                                <MaskedKey value={sub.apiKey} />
                                 <CopyButton text={sub.apiKey} />
                                 <button
                                   onClick={() => handleRollKey(sub)}
