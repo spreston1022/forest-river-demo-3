@@ -237,11 +237,11 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     return new Response(JSON.stringify(consumerToSubscription(existing, apiKey)), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch { /* create new */ }
 
-  const isBasic = body.planId === "basic";
+  const autoApprove = ["basic", "catalog", "commerce"].includes(body.planId);
   const consumer = await zuploPost(`/consumers`, {
     name: consumerName,
     description: (body.companyName || userEmail) + " — " + body.planName + " plan",
-    tags: { plan: body.planId, status: isBasic ? "active" : "pending" },
+    tags: { plan: body.planId, status: autoApprove ? "active" : "pending" },
     metadata: {
       userId, email: userEmail, planName: body.planName,
       companyName: body.companyName ?? "", dealerId: body.dealerId ?? "",
@@ -249,12 +249,12 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
       webhookUrl: body.webhookUrl ?? "",
       tosAccepted: body.tosAccepted ? "true" : "false", tosAcceptedAt: body.tosAcceptedAt ?? "",
       requestedAt: new Date().toISOString(),
-      ...(isBasic ? { resolvedAt: new Date().toISOString() } : {}),
+      ...(autoApprove ? { resolvedAt: new Date().toISOString() } : {}),
     },
   }) as ZuploConsumer;
 
   let apiKey: string | undefined;
-  if (isBasic) {
+  if (autoApprove) {
     const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: body.planId + " key for " + userEmail }) as { key: string };
     apiKey = keyData.key;
   }

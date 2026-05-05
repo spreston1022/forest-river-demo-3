@@ -68,87 +68,6 @@ function MaskedKey({ value }: { value: string }) {
   );
 }
 
-interface QuotaState {
-  limit: number;
-  remaining: number;
-  resetSeconds: number;
-}
-
-function QuotaBar({ apiKey }: { apiKey: string }) {
-  const [quota, setQuota] = useState<QuotaState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const fetchQuota = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      const res = await fetch(`${GATEWAY_URL}/me/quota`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      // Rate-limit data is in the body (injected by quota-outbound policy)
-      const data = await res.json() as { limit?: number; remaining?: number; reset?: number };
-      const limit = data.limit ?? 0;
-      const remaining = res.status === 429 ? 0 : (data.remaining ?? 0);
-      const reset = data.reset ?? 60;
-      if (limit > 0) {
-        setQuota({ limit, remaining, resetSeconds: reset });
-      } else {
-        setError(true);
-      }
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiKey]);
-
-  useEffect(() => { fetchQuota(); }, [fetchQuota]);
-
-  // Countdown timer for reset
-  const [tick, setTick] = useState(0);
-  const fetchedAt = useRef(Date.now());
-  useEffect(() => {
-    fetchedAt.current = Date.now();
-    setTick(0);
-    const t = setInterval(() => setTick(n => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [quota]);
-
-  if (loading) return <div className="mt-3 text-xs text-muted-foreground animate-pulse">Loading quota…</div>;
-  if (error || !quota) return (
-    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-      Could not load quota.
-      <button onClick={fetchQuota} className="underline hover:no-underline">Retry</button>
-    </div>
-  );
-
-  const isUnlimited = quota.limit >= 10000;
-  const used = quota.limit - quota.remaining;
-  const pct = quota.limit > 0 ? (used / quota.limit) * 100 : 0;
-  const elapsed = Math.floor((Date.now() - fetchedAt.current) / 1000);
-  const secsLeft = Math.max(0, quota.resetSeconds - elapsed);
-  const barColor = pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-400" : "bg-green-500";
-
-  return (
-    <div className="mt-3 space-y-1.5">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          <span className="font-medium text-foreground">{used}</span> / {isUnlimited ? "∞" : quota.limit} req this minute
-        </span>
-        <span className="flex items-center gap-1.5">
-          resets in {secsLeft}s
-          <button onClick={fetchQuota} className="opacity-60 hover:opacity-100 transition-opacity" title="Refresh">↻</button>
-        </span>
-      </div>
-      {!isUnlimited && (
-        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -629,7 +548,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                                   {rollingKey === sub.id ? "Rolling…" : "Roll Key"}
                                 </button>
                               </div>
-                              <QuotaBar apiKey={sub.apiKey} />
+
                             </div>
                             {sub.oldKeyExpiry && new Date(sub.oldKeyExpiry) > new Date() && (
                               <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
