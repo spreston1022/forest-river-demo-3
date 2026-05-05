@@ -692,8 +692,7 @@
           },
           "policies": {
             "inbound": [
-              "api-key-inbound",
-              "plan-rate-limit-inbound"
+              "api-key-inbound"
             ]
           }
         },
