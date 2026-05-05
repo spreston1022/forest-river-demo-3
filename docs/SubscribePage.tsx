@@ -47,8 +47,8 @@ interface RegistrationFields {
 const PLANS: Plan[] = [
   { id: "catalog",   name: "Catalog",    tier: "free", approval: "manual", price: "Free",           rateLimit: "10 req/min",  monthlyQuota: "50,000 / month",    sla: "Best-effort",  apis: ["Vehicles", "Inventory", "Dealers"], description: "Read access to the product catalog, real-time inventory, and dealer network." },
   { id: "commerce",  name: "Commerce",   tier: "free", approval: "manual", price: "Free",           rateLimit: "10 req/min",  monthlyQuota: "50,000 / month",    sla: "Best-effort",  apis: ["Orders", "Pricing"],                description: "Access to order management and dealer pricing data." },
-  { id: "pro",       name: "Pro",        tier: "paid", approval: "manual", price: "$99 / month",    rateLimit: "50 req/min",  monthlyQuota: "5,000,000 / month", sla: "99.9% uptime", apis: ["All APIs"], highlighted: true,       description: "Full API access with guaranteed uptime SLA. Recommended for production integrations." },
-  { id: "enterprise",name: "Enterprise", tier: "paid", approval: "manual", price: "Custom pricing", rateLimit: "Unlimited",   monthlyQuota: "Unlimited",         sla: "99.99% uptime",apis: ["All APIs"],                          description: "Maximum scale with dedicated support and custom rate limits." },
+  { id: "pro",       name: "Pro",        tier: "paid", approval: "manual", price: "$50 / month",    rateLimit: "50 req/min",  monthlyQuota: "5,000,000 / month", sla: "99.9% uptime", apis: ["All APIs"], highlighted: true,       description: "Full API access with guaranteed uptime SLA. Recommended for production integrations." },
+  { id: "enterprise",name: "Enterprise", tier: "paid", approval: "manual", price: "$500 / month", rateLimit: "Unlimited",   monthlyQuota: "Unlimited",         sla: "99.99% uptime",apis: ["All APIs"],                          description: "Maximum scale with dedicated support and custom rate limits." },
 ];
 
 const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoting", "Reporting & analytics", "Customer portal integration", "Other"];
