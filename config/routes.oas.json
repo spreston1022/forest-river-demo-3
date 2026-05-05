@@ -694,6 +694,9 @@
             "inbound": [
               "api-key-inbound",
               "plan-rate-limit-inbound"
+            ],
+            "outbound": [
+              "quota-ratelimit-outbound"
             ]
           }
         },

@@ -131,6 +131,14 @@
       }
     },
     {
+      "name": "quota-ratelimit-outbound",
+      "policyType": "custom-code-outbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/quota-outbound)"
+      }
+    },
+    {
       "name": "mock-api-inbound",
       "policyType": "mock-api-inbound",
       "handler": {
