@@ -484,7 +484,7 @@
           },
           "policies": {
             "inbound": [
-              "api-key-inbound"
+              "monetization-inbound"
             ]
           }
         },
