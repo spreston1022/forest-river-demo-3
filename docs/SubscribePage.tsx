@@ -86,12 +86,13 @@ function QuotaBar({ apiKey }: { apiKey: string }) {
       const res = await fetch(`${GATEWAY_URL}/me/quota`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
-      // Read headers on both 200 and 429 — Zuplo includes rate-limit headers either way
-      const limit = parseInt(res.headers.get("x-ratelimit-limit") ?? "0", 10);
-      const remaining = parseInt(res.headers.get("x-ratelimit-remaining") ?? "0", 10);
-      const reset = parseInt(res.headers.get("x-ratelimit-reset") ?? "60", 10);
+      // Rate-limit data is in the body (injected by quota-outbound policy)
+      const data = await res.json() as { limit?: number; remaining?: number; reset?: number };
+      const limit = data.limit ?? 0;
+      const remaining = res.status === 429 ? 0 : (data.remaining ?? 0);
+      const reset = data.reset ?? 60;
       if (limit > 0) {
-        setQuota({ limit, remaining: res.status === 429 ? 0 : remaining, resetSeconds: reset });
+        setQuota({ limit, remaining, resetSeconds: reset });
       } else {
         setError(true);
       }
