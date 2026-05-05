@@ -12,6 +12,7 @@ interface Plan {
   name: string;
   tier: "free" | "paid";
   approval: "auto" | "manual";
+  price: string;
   rateLimit: string;
   monthlyQuota: string;
   sla: string;
@@ -44,10 +45,10 @@ interface RegistrationFields {
 }
 
 const PLANS: Plan[] = [
-  { id: "catalog",   name: "Catalog",    tier: "free", approval: "auto",   rateLimit: "10 req/min",       monthlyQuota: "50,000 / month",      sla: "Best-effort",    apis: ["Vehicles", "Inventory", "Dealers"], description: "Read access to the product catalog, real-time inventory, and dealer network. Auto-approved." },
-  { id: "commerce",  name: "Commerce",   tier: "free", approval: "auto",   rateLimit: "10 req/min",       monthlyQuota: "50,000 / month",      sla: "Best-effort",    apis: ["Orders", "Pricing"],                 description: "Access to order management and dealer pricing data. Auto-approved." },
-  { id: "pro",       name: "Pro",        tier: "paid", approval: "manual", rateLimit: "50 req/min",       monthlyQuota: "5,000,000 / month",   sla: "99.9% uptime",   apis: ["All APIs"], highlighted: true,        description: "Full API access with guaranteed uptime SLA. Recommended for production integrations." },
-  { id: "enterprise",name: "Enterprise", tier: "paid", approval: "manual", rateLimit: "Unlimited",        monthlyQuota: "Unlimited",           sla: "99.99% uptime",  apis: ["All APIs"],                          description: "Maximum scale with dedicated support and custom rate limits." },
+  { id: "catalog",   name: "Catalog",    tier: "free", approval: "manual", price: "Free",           rateLimit: "10 req/min",  monthlyQuota: "50,000 / month",    sla: "Best-effort",  apis: ["Vehicles", "Inventory", "Dealers"], description: "Read access to the product catalog, real-time inventory, and dealer network." },
+  { id: "commerce",  name: "Commerce",   tier: "free", approval: "manual", price: "Free",           rateLimit: "10 req/min",  monthlyQuota: "50,000 / month",    sla: "Best-effort",  apis: ["Orders", "Pricing"],                description: "Access to order management and dealer pricing data." },
+  { id: "pro",       name: "Pro",        tier: "paid", approval: "manual", price: "$99 / month",    rateLimit: "50 req/min",  monthlyQuota: "5,000,000 / month", sla: "99.9% uptime", apis: ["All APIs"], highlighted: true,       description: "Full API access with guaranteed uptime SLA. Recommended for production integrations." },
+  { id: "enterprise",name: "Enterprise", tier: "paid", approval: "manual", price: "Custom pricing", rateLimit: "Unlimited",   monthlyQuota: "Unlimited",         sla: "99.99% uptime",apis: ["All APIs"],                          description: "Maximum scale with dedicated support and custom rate limits." },
 ];
 
 const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoting", "Reporting & analytics", "Customer portal integration", "Other"];
@@ -456,11 +457,16 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                         </div>
                       )}
                       <div className="mb-4">
-                        <h2 className="text-xl font-bold">{plan.name}</h2>
+                        <div className="flex items-start justify-between gap-2">
+                          <h2 className="text-xl font-bold">{plan.name}</h2>
+                          <span className={`text-lg font-bold ${plan.tier === "free" ? "text-green-700 dark:text-green-400" : "text-foreground"}`}>
+                            {plan.price}
+                          </span>
+                        </div>
                         <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
                       </div>
                       <dl className="mb-4 space-y-2 text-sm">
-                        {[["Rate limit", plan.rateLimit], ["Monthly quota", plan.monthlyQuota], ["SLA", plan.sla], ["Approval", plan.approval === "auto" ? "Instant" : "Admin review"]].map(([label, value]) => (
+                        {[["Rate limit", plan.rateLimit], ["Monthly quota", plan.monthlyQuota], ["SLA", plan.sla], ["Approval", "Admin review"]].map(([label, value]) => (
                           <div key={label} className="flex justify-between">
                             <dt className="text-muted-foreground">{label}</dt>
                             <dd className="font-medium">{value}</dd>
