@@ -26,9 +26,10 @@ interface Subscription {
 }
 
 const PLANS = [
-  { id: "basic", name: "Basic", rateLimit: "100 req/min", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" },
-  { id: "pro", name: "Pro", rateLimit: "15 req/min", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300" },
-  { id: "enterprise", name: "Enterprise", rateLimit: "Unlimited", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" },
+  { id: "catalog",    name: "Catalog",    rateLimit: "10 req/min",  color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" },
+  { id: "commerce",   name: "Commerce",   rateLimit: "10 req/min",  color: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300" },
+  { id: "pro",        name: "Pro",        rateLimit: "50 req/min",  color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300" },
+  { id: "enterprise", name: "Enterprise", rateLimit: "Unlimited",   color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" },
 ];
 
 type TabType = "requests" | "groups" | "announcements";

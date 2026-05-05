@@ -63,6 +63,7 @@
               "kill-switch-vehicles",
               "api-key-inbound",
               "revocation-check-inbound",
+              "plan-access-catalog",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -296,6 +297,7 @@
               "kill-switch-inventory",
               "api-key-inbound",
               "revocation-check-inbound",
+              "plan-access-catalog",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -443,6 +445,7 @@
               "kill-switch-dealers",
               "api-key-inbound",
               "revocation-check-inbound",
+              "plan-access-catalog",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -613,6 +616,7 @@
               "kill-switch-orders",
               "api-key-inbound",
               "revocation-check-inbound",
+              "plan-access-commerce",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -702,6 +706,7 @@
               "kill-switch-orders",
               "api-key-inbound",
               "revocation-check-inbound",
+              "plan-access-commerce",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -792,6 +797,7 @@
               "kill-switch-orders",
               "api-key-inbound",
               "revocation-check-inbound",
+              "plan-access-commerce",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
@@ -903,6 +909,7 @@
               "kill-switch-pricing",
               "api-key-inbound",
               "revocation-check-inbound",
+              "plan-access-commerce",
               "plan-rate-limit-inbound",
               "mock-api-inbound"
             ]
