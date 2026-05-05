@@ -1,5 +1,4 @@
 import type { ZudokuConfig } from "zudoku";
-import { createApiIdentityPlugin } from "zudoku/plugins";
 import { SubscribePage } from "./SubscribePage";
 import { AdminPage } from "./AdminPage";
 import { SupportPage } from "./SupportPage";
@@ -171,19 +170,6 @@ const config: ZudokuConfig = {
     "head-navigation-end": <ChatWidget />,
   },
 
-  plugins: [
-    createApiIdentityPlugin({
-      getIdentities: async (context) => [
-        {
-          id: "oauth-token",
-          label: "OAuth Token",
-          authorizeRequest: (request) => {
-            return context.authentication?.signRequest(request);
-          },
-        },
-      ],
-    }),
-  ],
 };
 
 export default config;
