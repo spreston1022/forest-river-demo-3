@@ -325,7 +325,7 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     description: (body.companyName || userEmail) + " — " + body.planName + " plan",
     tags: { plan: body.planId, status: "pending" },
     metadata: {
-      userId, email: userEmail, planName: body.planName,
+      userId, email: userEmail, plan: body.planId, planName: body.planName,
       companyName: body.companyName ?? "", dealerId: body.dealerId ?? "",
       useCase: body.useCase ?? "", expectedVolume: body.expectedVolume ?? "",
       webhookUrl: body.webhookUrl ?? "",
