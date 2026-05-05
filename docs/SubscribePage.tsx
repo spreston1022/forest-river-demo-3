@@ -72,12 +72,11 @@ interface QuotaState {
   limit: number;
   remaining: number;
   resetSeconds: number;
-  fetchedAt: number;
 }
 
 function QuotaBar({ apiKey }: { apiKey: string }) {
   const [quota, setQuota] = useState<QuotaState | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const fetchQuota = useCallback(async () => {
@@ -87,11 +86,12 @@ function QuotaBar({ apiKey }: { apiKey: string }) {
       const res = await fetch(`${GATEWAY_URL}/me/quota`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
+      // Read headers on both 200 and 429 — Zuplo includes rate-limit headers either way
       const limit = parseInt(res.headers.get("x-ratelimit-limit") ?? "0", 10);
       const remaining = parseInt(res.headers.get("x-ratelimit-remaining") ?? "0", 10);
-      const reset = parseInt(res.headers.get("x-ratelimit-reset") ?? "0", 10);
+      const reset = parseInt(res.headers.get("x-ratelimit-reset") ?? "60", 10);
       if (limit > 0) {
-        setQuota({ limit, remaining, resetSeconds: reset, fetchedAt: Date.now() });
+        setQuota({ limit, remaining: res.status === 429 ? 0 : remaining, resetSeconds: reset });
       } else {
         setError(true);
       }
@@ -104,47 +104,47 @@ function QuotaBar({ apiKey }: { apiKey: string }) {
 
   useEffect(() => { fetchQuota(); }, [fetchQuota]);
 
-  // Countdown timer
-  const [now, setNow] = useState(Date.now());
+  // Countdown timer for reset
+  const [tick, setTick] = useState(0);
+  const fetchedAt = useRef(Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
+    fetchedAt.current = Date.now();
+    setTick(0);
+    const t = setInterval(() => setTick(n => n + 1), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [quota]);
 
-  if (loading) {
-    return <div className="mt-3 text-xs text-muted-foreground animate-pulse">Checking quota…</div>;
-  }
-  if (error || !quota) {
-    return (
-      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-        Could not load quota.
-        <button onClick={fetchQuota} className="underline hover:no-underline">Retry</button>
-      </div>
-    );
-  }
+  if (loading) return <div className="mt-3 text-xs text-muted-foreground animate-pulse">Loading quota…</div>;
+  if (error || !quota) return (
+    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+      Could not load quota.
+      <button onClick={fetchQuota} className="underline hover:no-underline">Retry</button>
+    </div>
+  );
 
-  const used = Math.max(0, quota.limit - quota.remaining);
+  const isUnlimited = quota.limit >= 10000;
+  const used = quota.limit - quota.remaining;
   const pct = quota.limit > 0 ? (used / quota.limit) * 100 : 0;
-  const elapsed = Math.floor((now - quota.fetchedAt) / 1000);
+  const elapsed = Math.floor((Date.now() - fetchedAt.current) / 1000);
   const secsLeft = Math.max(0, quota.resetSeconds - elapsed);
-  const color = pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-400" : "bg-green-500";
+  const barColor = pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-400" : "bg-green-500";
 
   return (
     <div className="mt-3 space-y-1.5">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          <span className="font-medium text-foreground">{used}</span> / {quota.limit} req/min used
+          <span className="font-medium text-foreground">{used}</span> / {isUnlimited ? "∞" : quota.limit} req this minute
         </span>
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-1.5">
           resets in {secsLeft}s
-          <button onClick={fetchQuota} className="opacity-60 hover:opacity-100 transition-opacity" title="Refresh quota">
-            ↻
-          </button>
+          <button onClick={fetchQuota} className="opacity-60 hover:opacity-100 transition-opacity" title="Refresh">↻</button>
         </span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-      </div>
+      {!isUnlimited && (
+        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+        </div>
+      )}
     </div>
   );
 }
