@@ -136,6 +136,15 @@ async function createStripeCustomer(email: string, name: string): Promise<string
   return customer.id as string;
 }
 
+async function createStripeSubscription(customerId: string, priceId: string): Promise<string> {
+  const subscription = await stripeRequest("POST", "/v1/subscriptions", {
+    customer: customerId,
+    "items[0][price]": priceId,
+    "payment_behavior": "allow_incomplete",
+  });
+  return subscription.id as string;
+}
+
 async function createStripeCheckoutSession(
   customerId: string,
   priceId: string,
@@ -389,11 +398,24 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
     return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
   }
 
-  // Free plans: provision key immediately, no Stripe
+  // Free plans: create Stripe customer + $0 subscription, then provision key
+  let stripeCustomerId = existing.metadata?.["stripeCustomerId"];
+  if (!stripeCustomerId) {
+    stripeCustomerId = await createStripeCustomer(email, company);
+    await zuploPatch(`/consumers/${consumerName}`, {
+      tags: { ...existing.tags },
+      metadata: { ...existing.metadata, stripeCustomerId },
+    });
+  }
+  const priceId = STRIPE_PRICE_IDS[planId];
+  if (!priceId) {
+    return new Response(JSON.stringify({ error: "No price configured for plan: " + planId }), { status: 500 });
+  }
+  const stripeSubscriptionId = await createStripeSubscription(stripeCustomerId, priceId);
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Approved subscription key" }) as { key: string };
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, status: "active" },
-    metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
+    metadata: { ...existing.metadata, stripeCustomerId, stripeSubscriptionId, resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
   if (email) context.waitUntil(sendEmail(email, "Your " + plan + " API Access is Approved", approvalHtml(company, plan, keyData.key), context));
   return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), { status: 200, headers: { "Content-Type": "application/json" } });
