@@ -203,7 +203,8 @@
       "name": "portal-cors",
       "allowedOrigins": [
         "https://forest-river-demo-main-fb06bf1.zuplo.site",
-        "https://forest-river-demo-main-5ef061c.zuplo.site"
+        "https://forest-river-demo-main-5ef061c.zuplo.site",
+        "https://portal.forest-river-demo.us"
       ],
       "allowedMethods": [
         "GET",
