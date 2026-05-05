@@ -61,7 +61,7 @@
           "policies": {
             "inbound": [
               "kill-switch-vehicles",
-              "monetization-inbound",
+              "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-catalog",
               "plan-rate-limit-inbound",
@@ -295,7 +295,7 @@
           "policies": {
             "inbound": [
               "kill-switch-inventory",
-              "monetization-inbound",
+              "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-catalog",
               "plan-rate-limit-inbound",
@@ -443,7 +443,7 @@
           "policies": {
             "inbound": [
               "kill-switch-dealers",
-              "monetization-inbound",
+              "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-catalog",
               "plan-rate-limit-inbound",
@@ -614,7 +614,7 @@
           "policies": {
             "inbound": [
               "kill-switch-orders",
-              "monetization-inbound",
+              "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
@@ -704,7 +704,7 @@
           "policies": {
             "inbound": [
               "kill-switch-orders",
-              "monetization-inbound",
+              "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
@@ -795,7 +795,7 @@
           "policies": {
             "inbound": [
               "kill-switch-orders",
-              "monetization-inbound",
+              "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
@@ -907,7 +907,7 @@
           "policies": {
             "inbound": [
               "kill-switch-pricing",
-              "monetization-inbound",
+              "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
@@ -1048,7 +1048,7 @@
             "inbound": [
               "kill-switch-mcp",
               "mcp-query-param-to-header-inbound",
-              "monetization-inbound",
+              "api-key-inbound",
               "revocation-check-inbound"
             ]
           }
