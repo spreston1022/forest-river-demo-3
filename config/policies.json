@@ -216,6 +216,11 @@
         "Authorization",
         "Content-Type"
       ],
+      "exposedHeaders": [
+        "x-ratelimit-limit",
+        "x-ratelimit-remaining",
+        "x-ratelimit-reset"
+      ],
       "allowCredentials": true,
       "maxAge": 86400
     }
