@@ -24,7 +24,7 @@ interface Subscription {
   id: string;
   planId: "catalog" | "commerce" | "pro" | "enterprise" | string;
   planName: string;
-  status: "pending" | "active" | "rejected" | "suspended";
+  status: "pending" | "active" | "rejected" | "suspended" | "approved_pending_payment";
   apiKey?: string;
   oldKeyExpiry?: string;
   requestedAt: string;
@@ -68,88 +68,6 @@ function MaskedKey({ value }: { value: string }) {
   );
 }
 
-
-interface QuotaState {
-  limit: number;
-  remaining: number;
-  resetSeconds: number;
-}
-
-function QuotaBar({ apiKey }: { apiKey: string }) {
-  const [quota, setQuota] = useState<QuotaState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const fetchQuota = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      // No credentials mode — API key is an explicit header, not a cookie.
-      // This allows the non-credentialed quota-cors policy to expose x-ratelimit-* headers.
-      const res = await fetch(`${GATEWAY_URL}/me/quota`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        credentials: "omit",
-      });
-      const limit = parseInt(res.headers.get("x-ratelimit-limit") ?? "0", 10);
-      const remaining = parseInt(res.headers.get("x-ratelimit-remaining") ?? "0", 10);
-      const reset = parseInt(res.headers.get("x-ratelimit-reset") ?? "60", 10);
-      if (limit > 0) {
-        setQuota({ limit, remaining: res.status === 429 ? 0 : remaining, resetSeconds: reset });
-      } else {
-        setError(true);
-      }
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiKey]);
-
-  useEffect(() => { fetchQuota(); }, [fetchQuota]);
-
-  const [tick, setTick] = useState(0);
-  const fetchedAt = useRef(Date.now());
-  useEffect(() => {
-    fetchedAt.current = Date.now();
-    setTick(0);
-    const t = setInterval(() => setTick(n => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [quota]);
-
-  if (loading) return <div className="mt-3 text-xs text-muted-foreground animate-pulse">Loading quota…</div>;
-  if (error || !quota) return (
-    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-      Could not load quota.
-      <button onClick={fetchQuota} className="underline hover:no-underline">Retry</button>
-    </div>
-  );
-
-  const isUnlimited = quota.limit >= 10000;
-  const used = quota.limit - quota.remaining;
-  const pct = quota.limit > 0 ? (used / quota.limit) * 100 : 0;
-  const elapsed = Math.floor((Date.now() - fetchedAt.current) / 1000);
-  const secsLeft = Math.max(0, quota.resetSeconds - elapsed);
-  const barColor = pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-400" : "bg-green-500";
-
-  return (
-    <div className="mt-3 space-y-1.5">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          <span className="font-medium text-foreground">{used}</span> / {isUnlimited ? "∞" : quota.limit} req this minute
-        </span>
-        <span className="flex items-center gap-1.5">
-          resets in {secsLeft}s
-          <button onClick={fetchQuota} className="opacity-60 hover:opacity-100 transition-opacity" title="Refresh">↻</button>
-        </span>
-      </div>
-      {!isUnlimited && (
-        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -364,6 +282,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
   const [rollingKey, setRollingKey] = useState<string | null>(null);
+  const [completingCheckout, setCompletingCheckout] = useState<string | null>(null);
   const auth = useAuth();
   const { authentication } = useZudoku();
 
@@ -386,7 +305,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
         setSubscriptions(prev => {
           data.forEach((sub: Subscription) => {
             const old = prev.find(s => s.id === sub.id);
-            if (old?.status === "pending" && sub.status === "active") {
+            if ((old?.status === "pending" || old?.status === "approved_pending_payment") && sub.status === "active") {
               showToast(`🎉 ${sub.planName} access approved! Your API key is ready.`, "success");
             }
           });
@@ -399,11 +318,24 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   useEffect(() => { if (auth.isAuthenticated) fetchSubscriptions(); }, [auth.isAuthenticated, fetchSubscriptions]);
 
   useEffect(() => {
-    const hasPending = subscriptions.some(s => s.status === "pending");
+    const hasPending = subscriptions.some(s => s.status === "pending" || s.status === "approved_pending_payment");
     if (!hasPending) return;
     const interval = setInterval(fetchSubscriptions, 5000);
     return () => clearInterval(interval);
   }, [subscriptions, fetchSubscriptions]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      showToast("Subscription complete! Your API key will appear shortly.", "success");
+      setView("subscriptions");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("checkout") === "cancelled") {
+      showToast("Checkout cancelled. You can try again from My Subscriptions.", "info");
+      setView("subscriptions");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [showToast]);
 
   const getSubscriptionForPlan = (planId: string) =>
     subscriptions.find(s => s.planId === planId && s.status !== "rejected");
@@ -441,6 +373,23 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
       showToast("Failed to submit request. Please try again.", "error");
       console.error(err);
     } finally { setSubmitting(false); }
+  };
+
+  const handleCompleteSubscription = async (sub: Subscription) => {
+    setCompletingCheckout(sub.id);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/subscriptions/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscriptionId: sub.id }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (err: any) {
+      showToast("Failed to start checkout. Please try again.", "error");
+      setCompletingCheckout(null);
+    }
   };
 
   const handleRollKey = async (sub: Subscription) => {
@@ -548,6 +497,14 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                             <p className="text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted — view your key in My Subscriptions</p>
                           </div>
                         )}
+                        {sub?.status === "approved_pending_payment" && (
+                          <div className="rounded-lg border border-blue-500 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-950">
+                            <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-1.5">✅ Approved — complete your subscription to activate</p>
+                            <button onClick={() => setView("subscriptions")} className="text-xs text-blue-700 dark:text-blue-400 underline hover:no-underline">
+                              Complete subscription →
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -603,9 +560,10 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
                             sub.status === "suspended" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300" :
+                            sub.status === "approved_pending_payment" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" :
                             "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
                           }`}>
-                            {sub.status === "active" ? "Active" : sub.status === "suspended" ? "Suspended" : "Pending"}
+                            {sub.status === "active" ? "Active" : sub.status === "suspended" ? "Suspended" : sub.status === "approved_pending_payment" ? "Approved" : "Pending"}
                           </span>
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
@@ -647,6 +605,20 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                         {sub.status === "pending" && (
                           <div className="mt-4 flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
                             <span className="animate-pulse">⏳</span> Waiting for admin approval — checking every 5 seconds…
+                          </div>
+                        )}
+                        {sub.status === "approved_pending_payment" && (
+                          <div className="mt-4 rounded-lg border border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950 p-4">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-3">
+                              ✅ Access approved — complete your subscription to receive your API key
+                            </p>
+                            <button
+                              onClick={() => handleCompleteSubscription(sub)}
+                              disabled={completingCheckout === sub.id}
+                              className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                            >
+                              {completingCheckout === sub.id ? "Redirecting to Stripe…" : "Complete subscription →"}
+                            </button>
                           </div>
                         )}
                       </div>
