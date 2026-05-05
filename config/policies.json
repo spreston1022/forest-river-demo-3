@@ -156,6 +156,19 @@
       }
     },
     {
+      "name": "monetization-inbound",
+      "policyType": "monetization-inbound",
+      "handler": {
+        "export": "MonetizationInboundPolicy",
+        "module": "$import(@zuplo/runtime)",
+        "options": {
+          "meters": {
+            "api-requests": 1
+          }
+        }
+      }
+    },
+    {
       "name": "mock-api-inbound",
       "policyType": "mock-api-inbound",
       "handler": {

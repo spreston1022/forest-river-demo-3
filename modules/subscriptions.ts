@@ -10,6 +10,13 @@ const AUTH0_DOMAIN = "dev-l3ayzqncrfw3ta50.us.auth0.com";
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const PORTAL_URL = "https://forest-river-demo-main-fb06bf1.zuplo.site";
 
+const STRIPE_PRICE_IDS: Record<string, string> = {
+  catalog: "price_1TTpvPLNOfSyVPaCh1Y74XMw",
+  commerce: "price_1TTpvlLNOfSyVPaC9PUBf7Sr",
+  pro: "price_1TTpxTLNOfSyVPaCB4MUaQ5a",
+  enterprise: "price_1TTpy5LNOfSyVPaCiQfabm92",
+};
+
 // ─── Email via Resend ─────────────────────────────────────────────────────────
 
 async function sendEmail(to: string, subject: string, html: string, context: ZuploContext): Promise<void> {
@@ -35,6 +42,18 @@ function approvalHtml(companyName: string, planName: string, apiKey: string): st
     + "<code style='font-family:monospace;font-size:14px;color:#026957;word-break:break-all'>" + apiKey + "</code></div>"
     + "<p>Include your key in every request: <code>Authorization: Bearer " + apiKey + "</code></p>"
     + "<p><a href='" + PORTAL_URL + "/api' style='display:inline-block;background:#026957;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold'>View API Reference</a></p>"
+    + "<hr style='border:none;border-top:1px solid #e2e2e2;margin:24px 0'/>"
+    + "<p style='font-size:12px;color:#666'>Questions? Visit the <a href='" + PORTAL_URL + "' style='color:#026957'>Forest River Developer Portal</a></p>"
+    + "</body></html>";
+}
+
+function approvedPendingPaymentHtml(companyName: string, planName: string): string {
+  return "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
+    + "<div style='background:#026957;padding:24px;margin-bottom:24px'><h1 style='color:#fff;margin:0;font-size:20px'>Forest River Developer Portal</h1></div>"
+    + "<h2 style='color:#026957'>Your Access Request Has Been Approved</h2>"
+    + "<p>Hi " + companyName + ",</p>"
+    + "<p>Your request for <strong>" + planName + " Plan</strong> access has been approved. Complete your subscription to receive your API key.</p>"
+    + "<p><a href='" + PORTAL_URL + "/my-subscriptions' style='display:inline-block;background:#026957;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold'>Complete Subscription →</a></p>"
     + "<hr style='border:none;border-top:1px solid #e2e2e2;margin:24px 0'/>"
     + "<p style='font-size:12px;color:#666'>Questions? Visit the <a href='" + PORTAL_URL + "' style='color:#026957'>Forest River Developer Portal</a></p>"
     + "</body></html>";
@@ -90,6 +109,79 @@ async function getUserEmail(request: ZuploRequest): Promise<string> {
     const profile = await res.json() as { email?: string };
     return profile.email ?? "";
   } catch { return ""; }
+}
+
+// ─── Stripe REST helpers ──────────────────────────────────────────────────────
+
+async function stripeRequest(method: string, path: string, body?: Record<string, string>): Promise<any> {
+  const key = environment.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY not configured");
+  const res = await fetch(`https://api.stripe.com${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    ...(body ? { body: new URLSearchParams(body).toString() } : {}),
+  });
+  if (!res.ok) throw new Error(`Stripe ${method} ${path} failed: ${await res.text()}`);
+  return res.json();
+}
+
+async function createStripeCustomer(email: string, name: string): Promise<string> {
+  const customer = await stripeRequest("POST", "/v1/customers", {
+    email,
+    ...(name ? { name } : {}),
+  });
+  return customer.id as string;
+}
+
+async function createStripeSubscription(customerId: string, priceId: string): Promise<string> {
+  const subscription = await stripeRequest("POST", "/v1/subscriptions", {
+    customer: customerId,
+    "items[0][price]": priceId,
+    "payment_behavior": "allow_incomplete",
+  });
+  return subscription.id as string;
+}
+
+async function createStripeCheckoutSession(
+  customerId: string,
+  priceId: string,
+  successUrl: string,
+  cancelUrl: string,
+  consumerName: string,
+): Promise<string> {
+  const session = await stripeRequest("POST", "/v1/checkout/sessions", {
+    customer: customerId,
+    "line_items[0][price]": priceId,
+    "line_items[0][quantity]": "1",
+    mode: "subscription",
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    "metadata[consumerName]": consumerName,
+  });
+  return session.url as string;
+}
+
+async function verifyStripeWebhook(payload: string, sig: string, secret: string): Promise<boolean> {
+  const parts = sig.split(",").reduce<Record<string, string>>((acc, part) => {
+    const [k, v] = part.split("=");
+    if (k && v) acc[k] = v;
+    return acc;
+  }, {});
+  const timestamp = parts["t"];
+  const v1 = parts["v1"];
+  if (!timestamp || !v1) return false;
+  if (Math.abs(Date.now() / 1000 - parseInt(timestamp)) > 300) return false;
+  const signedPayload = `${timestamp}.${payload}`;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const mac = await crypto.subtle.sign("HMAC", key, encoder.encode(signedPayload));
+  const expected = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return expected === v1;
 }
 
 // ─── Zuplo management API ─────────────────────────────────────────────────────
@@ -237,11 +329,22 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     return new Response(JSON.stringify(consumerToSubscription(existing, apiKey)), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch { /* create new */ }
 
-  const autoApprove = ["basic", "catalog", "commerce"].includes(body.planId);
+  const priceId = STRIPE_PRICE_IDS[body.planId];
+
+  // Create Stripe customer upfront so it's ready when admin approves
+  let stripeCustomerId: string | undefined;
+  if (priceId) {
+    try {
+      stripeCustomerId = await createStripeCustomer(userEmail, body.companyName ?? "");
+    } catch (err) {
+      context.log.warn("Stripe customer creation failed (continuing): " + String(err));
+    }
+  }
+
   const consumer = await zuploPost(`/consumers`, {
     name: consumerName,
     description: (body.companyName || userEmail) + " — " + body.planName + " plan",
-    tags: { plan: body.planId, status: autoApprove ? "active" : "pending" },
+    tags: { plan: body.planId, status: "pending" },
     metadata: {
       userId, email: userEmail, planName: body.planName,
       companyName: body.companyName ?? "", dealerId: body.dealerId ?? "",
@@ -249,17 +352,11 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
       webhookUrl: body.webhookUrl ?? "",
       tosAccepted: body.tosAccepted ? "true" : "false", tosAcceptedAt: body.tosAcceptedAt ?? "",
       requestedAt: new Date().toISOString(),
-      ...(autoApprove ? { resolvedAt: new Date().toISOString() } : {}),
+      ...(stripeCustomerId ? { stripeCustomerId } : {}),
     },
   }) as ZuploConsumer;
 
-  let apiKey: string | undefined;
-  if (autoApprove) {
-    const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: body.planId + " key for " + userEmail }) as { key: string };
-    apiKey = keyData.key;
-  }
-
-  return new Response(JSON.stringify(consumerToSubscription(consumer, apiKey)), { status: 201, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(consumerToSubscription(consumer)), { status: 201, headers: { "Content-Type": "application/json" } });
 }
 
 /** GET /subscriptions */
@@ -290,16 +387,132 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
   if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   const consumerName = request.params.id;
   const existing = await getConsumerWithKey(consumerName);
+  const planId = existing.tags?.["plan"] ?? "";
+  const email = existing.metadata?.["email"] ?? "";
+  const company = existing.metadata?.["companyName"] || email || "Dealer";
+  const plan = existing.metadata?.["planName"] ?? "API";
+
+  // Paid plans: approve but require user to complete Stripe Checkout
+  if (["pro", "enterprise"].includes(planId)) {
+    const updated = await zuploPatch(`/consumers/${consumerName}`, {
+      tags: { ...existing.tags, status: "approved_pending_payment" },
+      metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
+    }) as ZuploConsumer;
+    if (email) context.waitUntil(sendEmail(email, "Complete Your " + plan + " Subscription", approvedPendingPaymentHtml(company, plan), context));
+    return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
+  // Free plans: create $0 Stripe subscription then provision key immediately
+  const stripeCustomerId = existing.metadata?.["stripeCustomerId"];
+  const freePriceId = STRIPE_PRICE_IDS[planId];
+  if (stripeCustomerId && freePriceId) {
+    try {
+      const stripeSubscriptionId = await createStripeSubscription(stripeCustomerId, freePriceId);
+      await zuploPatch(`/consumers/${consumerName}`, {
+        tags: { ...existing.tags },
+        metadata: { ...existing.metadata, stripeSubscriptionId },
+      });
+    } catch (err) {
+      context.log.warn("Stripe subscription creation failed for free plan (continuing): " + String(err));
+    }
+  }
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Approved subscription key" }) as { key: string };
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, status: "active" },
     metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
-  const email = existing.metadata?.["email"] ?? "";
-  const company = existing.metadata?.["companyName"] || email || "Dealer";
-  const plan = existing.metadata?.["planName"] ?? "API";
   if (email) context.waitUntil(sendEmail(email, "Your " + plan + " API Access is Approved", approvalHtml(company, plan, keyData.key), context));
   return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/** POST /subscriptions/checkout */
+export async function createCheckoutSession(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  const userId = request.user.sub!;
+  const body = await request.json() as { subscriptionId: string };
+  const consumerName = body.subscriptionId;
+
+  const existing = await getConsumerWithKey(consumerName);
+  if (existing.metadata?.["userId"] !== userId) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+  }
+  if (existing.tags?.["status"] !== "approved_pending_payment") {
+    return new Response(JSON.stringify({ error: "Subscription not awaiting payment" }), { status: 400 });
+  }
+
+  const stripeCustomerId = existing.metadata?.["stripeCustomerId"];
+  if (!stripeCustomerId) {
+    return new Response(JSON.stringify({ error: "Stripe customer not found — please contact support" }), { status: 500 });
+  }
+
+  const planId = existing.tags?.["plan"] ?? "";
+  const priceId = STRIPE_PRICE_IDS[planId];
+  if (!priceId) {
+    return new Response(JSON.stringify({ error: "Unknown plan" }), { status: 400 });
+  }
+
+  const checkoutUrl = await createStripeCheckoutSession(
+    stripeCustomerId, priceId,
+    `${PORTAL_URL}/my-subscriptions?checkout=success`,
+    `${PORTAL_URL}/my-subscriptions?checkout=cancelled`,
+    consumerName,
+  );
+
+  return new Response(JSON.stringify({ url: checkoutUrl }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/** POST /webhooks/stripe */
+export async function handleStripeWebhook(request: ZuploRequest, context: ZuploContext) {
+  const sig = request.headers.get("stripe-signature") ?? "";
+  const secret = environment.STRIPE_WEBHOOK_SECRET;
+  if (!secret) {
+    context.log.error("STRIPE_WEBHOOK_SECRET not configured");
+    return new Response("Webhook secret not configured", { status: 500 });
+  }
+
+  const payload = await request.text();
+  const valid = await verifyStripeWebhook(payload, sig, secret);
+  if (!valid) {
+    context.log.warn("Invalid Stripe webhook signature");
+    return new Response("Invalid signature", { status: 400 });
+  }
+
+  const event = JSON.parse(payload) as { type: string; data: { object: Record<string, any> } };
+  context.log.info("Stripe webhook: " + event.type);
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const consumerName = session["metadata"]?.["consumerName"] as string | undefined;
+    if (!consumerName) {
+      context.log.warn("No consumerName in Stripe checkout session metadata");
+      return new Response("OK", { status: 200 });
+    }
+    context.waitUntil((async () => {
+      try {
+        const existing = await getConsumerWithKey(consumerName);
+        if (existing.tags?.["status"] === "approved_pending_payment") {
+          const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Subscription key" }) as { key: string };
+          await zuploPatch(`/consumers/${consumerName}`, {
+            tags: { ...existing.tags, status: "active" },
+            metadata: {
+              ...existing.metadata,
+              resolvedAt: new Date().toISOString(),
+              stripeSubscriptionId: (session["subscription"] as string) ?? "",
+            },
+          });
+          const email = existing.metadata?.["email"] ?? "";
+          const company = existing.metadata?.["companyName"] || email || "Dealer";
+          const plan = existing.metadata?.["planName"] ?? "API";
+          if (email) await sendEmail(email, "Your " + plan + " API Access is Now Active", approvalHtml(company, plan, keyData.key), context);
+          context.log.info("Key provisioned for " + consumerName + " after Stripe checkout");
+        }
+      } catch (err) {
+        context.log.error("Failed to process checkout for " + consumerName + ": " + String(err));
+      }
+    })());
+  }
+
+  return new Response("OK", { status: 200 });
 }
 
 /** POST /admin/subscriptions/:id/reject */

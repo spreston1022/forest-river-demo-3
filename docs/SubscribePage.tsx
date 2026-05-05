@@ -24,7 +24,7 @@ interface Subscription {
   id: string;
   planId: "catalog" | "commerce" | "pro" | "enterprise" | string;
   planName: string;
-  status: "pending" | "active" | "rejected" | "suspended";
+  status: "pending" | "active" | "rejected" | "suspended" | "approved_pending_payment";
   apiKey?: string;
   oldKeyExpiry?: string;
   requestedAt: string;
@@ -282,6 +282,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
   const [rollingKey, setRollingKey] = useState<string | null>(null);
+  const [completingCheckout, setCompletingCheckout] = useState<string | null>(null);
   const auth = useAuth();
   const { authentication } = useZudoku();
 
@@ -304,7 +305,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
         setSubscriptions(prev => {
           data.forEach((sub: Subscription) => {
             const old = prev.find(s => s.id === sub.id);
-            if (old?.status === "pending" && sub.status === "active") {
+            if ((old?.status === "pending" || old?.status === "approved_pending_payment") && sub.status === "active") {
               showToast(`🎉 ${sub.planName} access approved! Your API key is ready.`, "success");
             }
           });
@@ -317,11 +318,24 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   useEffect(() => { if (auth.isAuthenticated) fetchSubscriptions(); }, [auth.isAuthenticated, fetchSubscriptions]);
 
   useEffect(() => {
-    const hasPending = subscriptions.some(s => s.status === "pending");
+    const hasPending = subscriptions.some(s => s.status === "pending" || s.status === "approved_pending_payment");
     if (!hasPending) return;
     const interval = setInterval(fetchSubscriptions, 5000);
     return () => clearInterval(interval);
   }, [subscriptions, fetchSubscriptions]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      showToast("Subscription complete! Your API key will appear shortly.", "success");
+      setView("subscriptions");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("checkout") === "cancelled") {
+      showToast("Checkout cancelled. You can try again from My Subscriptions.", "info");
+      setView("subscriptions");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [showToast]);
 
   const getSubscriptionForPlan = (planId: string) =>
     subscriptions.find(s => s.planId === planId && s.status !== "rejected");
@@ -359,6 +373,23 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
       showToast("Failed to submit request. Please try again.", "error");
       console.error(err);
     } finally { setSubmitting(false); }
+  };
+
+  const handleCompleteSubscription = async (sub: Subscription) => {
+    setCompletingCheckout(sub.id);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/subscriptions/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscriptionId: sub.id }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (err: any) {
+      showToast("Failed to start checkout. Please try again.", "error");
+      setCompletingCheckout(null);
+    }
   };
 
   const handleRollKey = async (sub: Subscription) => {
@@ -466,6 +497,14 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                             <p className="text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted — view your key in My Subscriptions</p>
                           </div>
                         )}
+                        {sub?.status === "approved_pending_payment" && (
+                          <div className="rounded-lg border border-blue-500 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-950">
+                            <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-1.5">✅ Approved — complete your subscription to activate</p>
+                            <button onClick={() => setView("subscriptions")} className="text-xs text-blue-700 dark:text-blue-400 underline hover:no-underline">
+                              Complete subscription →
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -521,9 +560,10 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
                             sub.status === "suspended" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300" :
+                            sub.status === "approved_pending_payment" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" :
                             "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
                           }`}>
-                            {sub.status === "active" ? "Active" : sub.status === "suspended" ? "Suspended" : "Pending"}
+                            {sub.status === "active" ? "Active" : sub.status === "suspended" ? "Suspended" : sub.status === "approved_pending_payment" ? "Approved" : "Pending"}
                           </span>
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
@@ -565,6 +605,20 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                         {sub.status === "pending" && (
                           <div className="mt-4 flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
                             <span className="animate-pulse">⏳</span> Waiting for admin approval — checking every 5 seconds…
+                          </div>
+                        )}
+                        {sub.status === "approved_pending_payment" && (
+                          <div className="mt-4 rounded-lg border border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950 p-4">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-3">
+                              ✅ Access approved — complete your subscription to receive your API key
+                            </p>
+                            <button
+                              onClick={() => handleCompleteSubscription(sub)}
+                              disabled={completingCheckout === sub.id}
+                              className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                            >
+                              {completingCheckout === sub.id ? "Redirecting to Stripe…" : "Complete subscription →"}
+                            </button>
                           </div>
                         )}
                       </div>

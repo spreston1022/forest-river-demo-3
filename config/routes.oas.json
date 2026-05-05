@@ -484,7 +484,7 @@
           },
           "policies": {
             "inbound": [
-              "api-key-inbound"
+              "monetization-inbound"
             ]
           }
         },
@@ -639,6 +639,70 @@
           },
           "404": {
             "description": "Not found"
+          }
+        }
+      }
+    },
+    "/subscriptions/checkout": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Create Stripe Checkout session for an approved subscription",
+        "operationId": "create-checkout-session",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "createCheckoutSession",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stripe Checkout session URL"
+          },
+          "400": {
+            "description": "Subscription not awaiting payment"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/webhooks/stripe": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Stripe webhook receiver",
+        "operationId": "stripe-webhook",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "handleStripeWebhook",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": []
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook received"
+          },
+          "400": {
+            "description": "Invalid signature"
           }
         }
       }
