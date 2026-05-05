@@ -88,6 +88,24 @@
       }
     },
     {
+      "name": "plan-access-catalog",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/plan-access)",
+        "options": { "allowedPlans": ["catalog", "basic", "pro", "enterprise"] }
+      }
+    },
+    {
+      "name": "plan-access-commerce",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/plan-access)",
+        "options": { "allowedPlans": ["commerce", "pro", "enterprise"] }
+      }
+    },
+    {
       "name": "revocation-check-inbound",
       "policyType": "custom-code-inbound",
       "handler": {

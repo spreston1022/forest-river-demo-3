@@ -8,19 +8,21 @@ const GATEWAY_URL = import.meta.env.ZUPLO_PUBLIC_SERVER_URL ?? "https://forest-r
 const TURNSTILE_SITEKEY = import.meta.env.ZUDOKU_PUBLIC_TURNSTILE_SITEKEY ?? "1x00000000000000000000AA";
 
 interface Plan {
-  id: "basic" | "pro" | "enterprise";
+  id: "catalog" | "commerce" | "pro" | "enterprise";
   name: string;
+  tier: "free" | "paid";
   approval: "auto" | "manual";
   rateLimit: string;
   monthlyQuota: string;
   sla: string;
+  apis: string[];
   highlighted?: boolean;
   description: string;
 }
 
 interface Subscription {
   id: string;
-  planId: "basic" | "pro" | "enterprise";
+  planId: "catalog" | "commerce" | "pro" | "enterprise" | string;
   planName: string;
   status: "pending" | "active" | "rejected" | "suspended";
   apiKey?: string;
@@ -42,9 +44,10 @@ interface RegistrationFields {
 }
 
 const PLANS: Plan[] = [
-  { id: "basic", name: "Basic", approval: "auto", rateLimit: "100 req/min", monthlyQuota: "50,000 / month", sla: "Best-effort", description: "Get started immediately with auto-approval. Great for exploration and prototyping." },
-  { id: "pro", name: "Pro", approval: "manual", rateLimit: "15 req/min", monthlyQuota: "5,000,000 / month", sla: "99.9% uptime", highlighted: true, description: "Production-grade access with guaranteed uptime SLA. Recommended for most dealer integrations." },
-  { id: "enterprise", name: "Enterprise", approval: "manual", rateLimit: "Unlimited", monthlyQuota: "Unlimited", sla: "99.99% uptime", description: "Maximum scale with dedicated support and custom rate limits." },
+  { id: "catalog",   name: "Catalog",    tier: "free", approval: "auto",   rateLimit: "10 req/min",       monthlyQuota: "50,000 / month",      sla: "Best-effort",    apis: ["Vehicles", "Inventory", "Dealers"], description: "Read access to the product catalog, real-time inventory, and dealer network. Auto-approved." },
+  { id: "commerce",  name: "Commerce",   tier: "free", approval: "auto",   rateLimit: "10 req/min",       monthlyQuota: "50,000 / month",      sla: "Best-effort",    apis: ["Orders", "Pricing"],                 description: "Access to order management and dealer pricing data. Auto-approved." },
+  { id: "pro",       name: "Pro",        tier: "paid", approval: "manual", rateLimit: "50 req/min",       monthlyQuota: "5,000,000 / month",   sla: "99.9% uptime",   apis: ["All APIs"], highlighted: true,        description: "Full API access with guaranteed uptime SLA. Recommended for production integrations." },
+  { id: "enterprise",name: "Enterprise", tier: "paid", approval: "manual", rateLimit: "Unlimited",        monthlyQuota: "Unlimited",           sla: "99.99% uptime",  apis: ["All APIs"],                          description: "Maximum scale with dedicated support and custom rate limits." },
 ];
 
 const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoting", "Reporting & analytics", "Customer portal integration", "Other"];
@@ -401,54 +404,74 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
       </div>
 
       {view === "plans" && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {PLANS.map(plan => {
-            const sub = getSubscriptionForPlan(plan.id);
-            return (
-              <div key={plan.id} className={`relative flex flex-col rounded-xl border p-6 ${plan.highlighted ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-border bg-card"}`}>
-                {plan.highlighted && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-primary-foreground">Recommended</span>
-                  </div>
-                )}
-                <div className="mb-4">
-                  <h2 className="text-xl font-bold">{plan.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
-                </div>
-                <dl className="mb-6 space-y-2 text-sm">
-                  {[["Rate limit", plan.rateLimit], ["Monthly quota", plan.monthlyQuota], ["SLA", plan.sla], ["Approval", plan.approval === "auto" ? "Instant" : "Admin review"]].map(([label, value]) => (
-                    <div key={label} className="flex justify-between">
-                      <dt className="text-muted-foreground">{label}</dt>
-                      <dd className="font-medium">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <div className="mt-auto">
-                  {!sub && (
-                    <button onClick={() => handleRequestAccess(plan)}
-                      className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${plan.highlighted ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border bg-background hover:bg-muted"}`}>
-                      {!auth.isAuthenticated ? "Sign in to request access" : "Request access"}
-                    </button>
-                  )}
-                  {sub?.status === "pending" && (
-                    <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-400 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-800 dark:border-yellow-600 dark:bg-yellow-950 dark:text-yellow-300">
-                      <span className="animate-pulse">⏳</span> Pending admin approval…
-                    </div>
-                  )}
-                  {sub?.status === "suspended" && (
-                    <div className="flex items-center justify-center gap-2 rounded-lg border border-orange-400 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-800 dark:border-orange-600 dark:bg-orange-950 dark:text-orange-300">
-                      ⏸️ Access suspended
-                    </div>
-                  )}
-                  {sub?.status === "active" && (
-                    <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
-                      <p className="text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted — view your key in My Subscriptions</p>
-                    </div>
-                  )}
-                </div>
+        <div className="space-y-8">
+          {(["free", "paid"] as const).map(tier => (
+            <div key={tier}>
+              <div className="flex items-center gap-3 mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {tier === "free" ? "Free Tier — Auto-approved" : "Paid Plans — Admin review"}
+                </p>
+                <div className="flex-1 h-px bg-border" />
               </div>
-            );
-          })}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {PLANS.filter(p => p.tier === tier).map(plan => {
+                  const sub = getSubscriptionForPlan(plan.id);
+                  return (
+                    <div key={plan.id} className={`relative flex flex-col rounded-xl border p-6 ${plan.highlighted ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-border bg-card"}`}>
+                      {plan.highlighted && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <span className="rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-primary-foreground">Recommended</span>
+                        </div>
+                      )}
+                      <div className="mb-4">
+                        <h2 className="text-xl font-bold">{plan.name}</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+                      </div>
+                      <dl className="mb-4 space-y-2 text-sm">
+                        {[["Rate limit", plan.rateLimit], ["Monthly quota", plan.monthlyQuota], ["SLA", plan.sla], ["Approval", plan.approval === "auto" ? "Instant" : "Admin review"]].map(([label, value]) => (
+                          <div key={label} className="flex justify-between">
+                            <dt className="text-muted-foreground">{label}</dt>
+                            <dd className="font-medium">{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <div className="mb-5">
+                        <p className="text-xs text-muted-foreground mb-1.5">API access</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {plan.apis.map(api => (
+                            <span key={api} className="rounded-full border bg-muted/60 px-2 py-0.5 text-xs font-medium">{api}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-auto">
+                        {!sub && (
+                          <button onClick={() => handleRequestAccess(plan)}
+                            className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${plan.highlighted ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border bg-background hover:bg-muted"}`}>
+                            {!auth.isAuthenticated ? "Sign in to request access" : "Request access"}
+                          </button>
+                        )}
+                        {sub?.status === "pending" && (
+                          <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-400 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-800 dark:border-yellow-600 dark:bg-yellow-950 dark:text-yellow-300">
+                            <span className="animate-pulse">⏳</span> Pending admin approval…
+                          </div>
+                        )}
+                        {sub?.status === "suspended" && (
+                          <div className="flex items-center justify-center gap-2 rounded-lg border border-orange-400 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-800 dark:border-orange-600 dark:bg-orange-950 dark:text-orange-300">
+                            ⏸️ Access suspended
+                          </div>
+                        )}
+                        {sub?.status === "active" && (
+                          <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
+                            <p className="text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted — view your key in My Subscriptions</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
