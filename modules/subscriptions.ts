@@ -136,15 +136,6 @@ async function createStripeCustomer(email: string, name: string): Promise<string
   return customer.id as string;
 }
 
-async function createStripeSubscription(customerId: string, priceId: string): Promise<string> {
-  const subscription = await stripeRequest("POST", "/v1/subscriptions", {
-    customer: customerId,
-    "items[0][price]": priceId,
-    "payment_behavior": "allow_incomplete",
-  });
-  return subscription.id as string;
-}
-
 async function createStripeCheckoutSession(
   customerId: string,
   priceId: string,
@@ -329,18 +320,6 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     return new Response(JSON.stringify(consumerToSubscription(existing, apiKey)), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch { /* create new */ }
 
-  const priceId = STRIPE_PRICE_IDS[body.planId];
-
-  // Create Stripe customer upfront so it's ready when admin approves
-  let stripeCustomerId: string | undefined;
-  if (priceId) {
-    try {
-      stripeCustomerId = await createStripeCustomer(userEmail, body.companyName ?? "");
-    } catch (err) {
-      context.log.warn("Stripe customer creation failed (continuing): " + String(err));
-    }
-  }
-
   const consumer = await zuploPost(`/consumers`, {
     name: consumerName,
     description: (body.companyName || userEmail) + " — " + body.planName + " plan",
@@ -352,7 +331,6 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
       webhookUrl: body.webhookUrl ?? "",
       tosAccepted: body.tosAccepted ? "true" : "false", tosAcceptedAt: body.tosAcceptedAt ?? "",
       requestedAt: new Date().toISOString(),
-      ...(stripeCustomerId ? { stripeCustomerId } : {}),
     },
   }) as ZuploConsumer;
 
@@ -392,30 +370,26 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
   const company = existing.metadata?.["companyName"] || email || "Dealer";
   const plan = existing.metadata?.["planName"] ?? "API";
 
-  // Paid plans: approve but require user to complete Stripe Checkout
+  // Paid plans: create Stripe customer, then require user to complete Stripe Checkout
   if (["pro", "enterprise"].includes(planId)) {
+    let stripeCustomerId = existing.metadata?.["stripeCustomerId"];
+    if (!stripeCustomerId) {
+      try {
+        stripeCustomerId = await createStripeCustomer(email, company);
+      } catch (err) {
+        context.log.error("Stripe customer creation failed: " + String(err));
+        return new Response(JSON.stringify({ error: "Failed to set up Stripe billing" }), { status: 500 });
+      }
+    }
     const updated = await zuploPatch(`/consumers/${consumerName}`, {
       tags: { ...existing.tags, status: "approved_pending_payment" },
-      metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
+      metadata: { ...existing.metadata, stripeCustomerId, resolvedAt: new Date().toISOString() },
     }) as ZuploConsumer;
     if (email) context.waitUntil(sendEmail(email, "Complete Your " + plan + " Subscription", approvedPendingPaymentHtml(company, plan), context));
     return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
   }
 
-  // Free plans: create $0 Stripe subscription then provision key immediately
-  const stripeCustomerId = existing.metadata?.["stripeCustomerId"];
-  const freePriceId = STRIPE_PRICE_IDS[planId];
-  if (stripeCustomerId && freePriceId) {
-    try {
-      const stripeSubscriptionId = await createStripeSubscription(stripeCustomerId, freePriceId);
-      await zuploPatch(`/consumers/${consumerName}`, {
-        tags: { ...existing.tags },
-        metadata: { ...existing.metadata, stripeSubscriptionId },
-      });
-    } catch (err) {
-      context.log.warn("Stripe subscription creation failed for free plan (continuing): " + String(err));
-    }
-  }
+  // Free plans: provision key immediately, no Stripe
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Approved subscription key" }) as { key: string };
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, status: "active" },
