@@ -156,6 +156,23 @@
       }
     },
     {
+      "name": "plan-quota-inbound",
+      "policyType": "rate-limit-inbound",
+      "handler": {
+        "export": "RateLimitInboundPolicy",
+        "module": "$import(@zuplo/runtime)",
+        "options": {
+          "rateLimitBy": "function",
+          "requestsAllowed": 500000,
+          "timeWindowMinutes": 43200,
+          "identifier": {
+            "export": "quota",
+            "module": "$import(./modules/quota)"
+          }
+        }
+      }
+    },
+    {
       "name": "monetization-inbound",
       "policyType": "monetization-inbound",
       "handler": {
