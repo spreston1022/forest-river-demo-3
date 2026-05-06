@@ -246,8 +246,10 @@ async function createZuploMeteringSubscription(
   stripeCustomerId: string,
   context: ZuploContext,
 ): Promise<void> {
-  const customerId = await getOrCreateMeteringCustomer(consumerName, userId, email, companyName, context);
-  await meteringPost("/subscriptions", { customerId, planKey, stripeCustomerId });
+  await getOrCreateMeteringCustomer(consumerName, userId, email, companyName, context);
+  // Use customerKey directly (Auth0 sub) — no ULID lookup needed.
+  // "plan" wraps the plan reference; "Create from plan" variant of the subscriptions endpoint.
+  await meteringPost("/subscriptions", { customerKey: userId, plan: { planKey } });
   context.log.info(`Metering subscription created: ${consumerName} on plan ${planKey}`);
 }
 
