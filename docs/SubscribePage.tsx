@@ -8,26 +8,22 @@ const GATEWAY_URL = import.meta.env.ZUPLO_PUBLIC_SERVER_URL ?? "https://forest-r
 const TURNSTILE_SITEKEY = import.meta.env.ZUDOKU_PUBLIC_TURNSTILE_SITEKEY ?? "1x00000000000000000000AA";
 
 interface Plan {
-  id: "catalog" | "commerce" | "pro" | "enterprise";
+  id: "basic" | "pro" | "enterprise";
   name: string;
-  tier: "free" | "paid";
   approval: "auto" | "manual";
-  price: string;
   rateLimit: string;
   monthlyQuota: string;
   sla: string;
-  apis: string[];
   highlighted?: boolean;
   description: string;
 }
 
 interface Subscription {
   id: string;
-  planId: "catalog" | "commerce" | "pro" | "enterprise" | string;
+  planId: "basic" | "pro" | "enterprise";
   planName: string;
-  status: "pending" | "active" | "rejected" | "suspended" | "approved_pending_payment" | "approved";
+  status: "pending" | "active" | "rejected";
   apiKey?: string;
-  oldKeyExpiry?: string;
   requestedAt: string;
   resolvedAt?: string;
   companyName?: string;
@@ -45,30 +41,13 @@ interface RegistrationFields {
 }
 
 const PLANS: Plan[] = [
-  { id: "catalog",   name: "Catalog",    tier: "free", approval: "manual", price: "Free",           rateLimit: "10 req/min",  monthlyQuota: "50,000 / month",    sla: "Best-effort",  apis: ["Vehicles", "Inventory", "Dealers"], description: "Read access to the product catalog, real-time inventory, and dealer network." },
-  { id: "commerce",  name: "Commerce",   tier: "free", approval: "manual", price: "Free",           rateLimit: "10 req/min",  monthlyQuota: "50,000 / month",    sla: "Best-effort",  apis: ["Orders", "Pricing"],                description: "Access to order management and dealer pricing data." },
-  { id: "pro",       name: "Pro",        tier: "paid", approval: "manual", price: "$50 / month",    rateLimit: "50 req/min",  monthlyQuota: "5,000,000 / month", sla: "99.9% uptime", apis: ["All APIs"], highlighted: true,       description: "Full API access with guaranteed uptime SLA. Recommended for production integrations." },
-  { id: "enterprise",name: "Enterprise", tier: "paid", approval: "manual", price: "$500 / month", rateLimit: "Unlimited",   monthlyQuota: "Unlimited",         sla: "99.99% uptime",apis: ["All APIs"],                          description: "Maximum scale with dedicated support and custom rate limits." },
+  { id: "basic", name: "Basic", approval: "auto", rateLimit: "100 req/min", monthlyQuota: "50,000 / month", sla: "Best-effort", description: "Get started immediately with auto-approval. Great for exploration and prototyping." },
+  { id: "pro", name: "Pro", approval: "manual", rateLimit: "15 req/min", monthlyQuota: "5,000,000 / month", sla: "99.9% uptime", highlighted: true, description: "Production-grade access with guaranteed uptime SLA. Recommended for most dealer integrations." },
+  { id: "enterprise", name: "Enterprise", approval: "manual", rateLimit: "Unlimited", monthlyQuota: "Unlimited", sla: "99.99% uptime", description: "Maximum scale with dedicated support and custom rate limits." },
 ];
 
 const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoting", "Reporting & analytics", "Customer portal integration", "Other"];
 const VOLUME_OPTIONS = ["< 10,000 / month", "10,000 – 100,000 / month", "100,000 – 1,000,000 / month", "> 1,000,000 / month"];
-
-function MaskedKey({ value }: { value: string }) {
-  const [revealed, setRevealed] = useState(false);
-  return (
-    <span className="flex items-center gap-1 flex-1 min-w-0">
-      <code className="flex-1 truncate text-sm font-mono">
-        {revealed ? value : "•".repeat(Math.min(value.length, 32))}
-      </code>
-      <button onClick={() => setRevealed(r => !r)}
-        className="ml-1 rounded px-2 py-0.5 text-xs font-medium border border-current opacity-70 hover:opacity-100 transition-opacity whitespace-nowrap">
-        {revealed ? "Hide" : "Reveal"}
-      </button>
-    </span>
-  );
-}
-
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -282,9 +261,6 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   const [modalPlan, setModalPlan] = useState<Plan | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
-  const [rollingKey, setRollingKey] = useState<string | null>(null);
-  const [completingCheckout, setCompletingCheckout] = useState<string | null>(null);
-  const [activating, setActivating] = useState<string | null>(null);
   const auth = useAuth();
   const { authentication } = useZudoku();
 
@@ -307,7 +283,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
         setSubscriptions(prev => {
           data.forEach((sub: Subscription) => {
             const old = prev.find(s => s.id === sub.id);
-            if ((old?.status === "pending" || old?.status === "approved_pending_payment") && sub.status === "active") {
+            if (old?.status === "pending" && sub.status === "active") {
               showToast(`🎉 ${sub.planName} access approved! Your API key is ready.`, "success");
             }
           });
@@ -320,24 +296,11 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   useEffect(() => { if (auth.isAuthenticated) fetchSubscriptions(); }, [auth.isAuthenticated, fetchSubscriptions]);
 
   useEffect(() => {
-    const hasPending = subscriptions.some(s => s.status === "pending" || s.status === "approved_pending_payment" || s.status === "approved");
+    const hasPending = subscriptions.some(s => s.status === "pending");
     if (!hasPending) return;
     const interval = setInterval(fetchSubscriptions, 5000);
     return () => clearInterval(interval);
   }, [subscriptions, fetchSubscriptions]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout") === "success") {
-      showToast("Subscription complete! Your API key will appear shortly.", "success");
-      setView("subscriptions");
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (params.get("checkout") === "cancelled") {
-      showToast("Checkout cancelled. You can try again from My Subscriptions.", "info");
-      setView("subscriptions");
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, [showToast]);
 
   const getSubscriptionForPlan = (planId: string) =>
     subscriptions.find(s => s.planId === planId && s.status !== "rejected");
@@ -362,7 +325,6 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
           webhookUrl: fields.webhookUrl,
           tosAccepted: fields.tosAccepted, tosAcceptedAt: new Date().toISOString(),
           turnstileToken,
-          userEmail: (auth.profile as any)?.email ?? "",
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -375,56 +337,6 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
       showToast("Failed to submit request. Please try again.", "error");
       console.error(err);
     } finally { setSubmitting(false); }
-  };
-
-  const handleCompleteSubscription = async (sub: Subscription) => {
-    setCompletingCheckout(sub.id);
-    try {
-      const res = await authFetch(`${GATEWAY_URL}/subscriptions/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscriptionId: sub.id }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const { url } = await res.json();
-      window.location.href = url;
-    } catch (err: any) {
-      showToast("Failed to start checkout. Please try again.", "error");
-      setCompletingCheckout(null);
-    }
-  };
-
-  const handleActivate = async (sub: Subscription) => {
-    setActivating(sub.id);
-    try {
-      const res = await authFetch(`${GATEWAY_URL}/subscriptions/${sub.id}/activate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data: Subscription = await res.json();
-      setSubscriptions(prev => prev.map(s => s.id === sub.id ? data : s));
-      showToast(`✅ ${sub.planName} API key activated!`, "success");
-    } catch (err: any) {
-      showToast(`Activation failed: ${err.message}`, "error");
-    } finally { setActivating(null); }
-  };
-
-  const handleRollKey = async (sub: Subscription) => {
-    if (!confirm("Roll your API key? Both your old and new keys will work for 1 hour, then the old one stops working.")) return;
-    setRollingKey(sub.id);
-    try {
-      const res = await authFetch(`${GATEWAY_URL}/subscriptions/roll-key`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscriptionId: sub.id }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, apiKey: data.apiKey, oldKeyExpiry: data.oldKeyExpiry } : s));
-      showToast("🔑 Key rolled! Your new key is shown below. Old key valid for 1 hour.", "success");
-    } catch (err: any) {
-      showToast(`Failed to roll key: ${err.message}`, "error");
-    } finally { setRollingKey(null); }
   };
 
   return (
@@ -454,95 +366,53 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
       </div>
 
       {view === "plans" && (
-        <div className="space-y-8">
-          {(["free", "paid"] as const).map(tier => (
-            <div key={tier}>
-              <div className="flex items-center gap-3 mb-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {tier === "free" ? "Free Tier — Auto-approved" : "Paid Plans — Admin review"}
-                </p>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {PLANS.filter(p => p.tier === tier).map(plan => {
-                  const sub = getSubscriptionForPlan(plan.id);
-                  return (
-                    <div key={plan.id} className={`relative flex flex-col rounded-xl border p-6 ${plan.highlighted ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-border bg-card"}`}>
-                      {plan.highlighted && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <span className="rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-primary-foreground">Recommended</span>
-                        </div>
-                      )}
-                      <div className="mb-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <h2 className="text-xl font-bold">{plan.name}</h2>
-                          <span className={`text-lg font-bold ${plan.tier === "free" ? "text-green-700 dark:text-green-400" : "text-foreground"}`}>
-                            {plan.price}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
-                      </div>
-                      <dl className="mb-4 space-y-2 text-sm">
-                        {[["Rate limit", plan.rateLimit], ["Monthly quota", plan.monthlyQuota], ["SLA", plan.sla], ["Approval", "Admin review"]].map(([label, value]) => (
-                          <div key={label} className="flex justify-between">
-                            <dt className="text-muted-foreground">{label}</dt>
-                            <dd className="font-medium">{value}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                      <div className="mb-5">
-                        <p className="text-xs text-muted-foreground mb-1.5">API access</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {plan.apis.map(api => (
-                            <span key={api} className="rounded-full border bg-muted/60 px-2 py-0.5 text-xs font-medium">{api}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-auto">
-                        {!sub && (
-                          <button onClick={() => handleRequestAccess(plan)}
-                            className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${plan.highlighted ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border bg-background hover:bg-muted"}`}>
-                            {!auth.isAuthenticated ? "Sign in to request access" : "Request access"}
-                          </button>
-                        )}
-                        {sub?.status === "pending" && (
-                          <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-400 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-800 dark:border-yellow-600 dark:bg-yellow-950 dark:text-yellow-300">
-                            <span className="animate-pulse">⏳</span> Pending admin approval…
-                          </div>
-                        )}
-                        {sub?.status === "suspended" && (
-                          <div className="flex items-center justify-center gap-2 rounded-lg border border-orange-400 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-800 dark:border-orange-600 dark:bg-orange-950 dark:text-orange-300">
-                            ⏸️ Access suspended
-                          </div>
-                        )}
-                        {sub?.status === "active" && (
-                          <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
-                            <p className="text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted — view your key in My Subscriptions</p>
-                          </div>
-                        )}
-                        {sub?.status === "approved_pending_payment" && (
-                          <div className="rounded-lg border border-blue-500 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-950">
-                            <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-1.5">✅ Approved — complete your subscription to activate</p>
-                            <button onClick={() => setView("subscriptions")} className="text-xs text-blue-700 dark:text-blue-400 underline hover:no-underline">
-                              Complete subscription →
-                            </button>
-                          </div>
-                        )}
-                        {sub?.status === "approved" && (
-                          <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
-                            <p className="text-xs font-medium text-green-800 dark:text-green-300 mb-1.5">✅ Approved — subscribe to get your API key</p>
-                            <a href="/pricing" className="text-xs text-green-700 dark:text-green-400 underline hover:no-underline">
-                              Subscribe now →
-                            </a>
-                          </div>
-                        )}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          {PLANS.map(plan => {
+            const sub = getSubscriptionForPlan(plan.id);
+            return (
+              <div key={plan.id} className={`relative flex flex-col rounded-xl border p-6 ${plan.highlighted ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-border bg-card"}`}>
+                {plan.highlighted && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-primary-foreground">Recommended</span>
+                  </div>
+                )}
+                <div className="mb-4">
+                  <h2 className="text-xl font-bold">{plan.name}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+                </div>
+                <dl className="mb-6 space-y-2 text-sm">
+                  {[["Rate limit", plan.rateLimit], ["Monthly quota", plan.monthlyQuota], ["SLA", plan.sla], ["Approval", plan.approval === "auto" ? "Instant" : "Admin review"]].map(([label, value]) => (
+                    <div key={label} className="flex justify-between">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="font-medium">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="mt-auto">
+                  {!sub && (
+                    <button onClick={() => handleRequestAccess(plan)}
+                      className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${plan.highlighted ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border bg-background hover:bg-muted"}`}>
+                      {!auth.isAuthenticated ? "Sign in to request access" : "Request access"}
+                    </button>
+                  )}
+                  {sub?.status === "pending" && (
+                    <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-400 bg-yellow-50 px-4 py-2 text-sm font-medium text-yellow-800 dark:border-yellow-600 dark:bg-yellow-950 dark:text-yellow-300">
+                      <span className="animate-pulse">⏳</span> Pending admin approval…
+                    </div>
+                  )}
+                  {sub?.status === "active" && (
+                    <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
+                      <p className="mb-1 text-xs font-medium text-green-800 dark:text-green-300">✅ Access granted</p>
+                      <div className="flex items-center">
+                        <code className="flex-1 truncate rounded text-xs font-mono text-green-900 dark:text-green-200">{sub.apiKey}</code>
+                        {sub.apiKey && <CopyButton text={sub.apiKey} />}
                       </div>
                     </div>
-                  );
-                })}
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -588,86 +458,30 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold text-lg">{sub.planName}</h3>
                           {sub.companyName && <span className="text-muted-foreground text-sm">— {sub.companyName}</span>}
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
-                            sub.status === "suspended" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300" :
-                            sub.status === "approved_pending_payment" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" :
-                            sub.status === "approved" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
-                            "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
-                          }`}>
-                            {sub.status === "active" ? "Active" :
-                             sub.status === "suspended" ? "Suspended" :
-                             sub.status === "approved_pending_payment" ? "Approved" :
-                             sub.status === "approved" ? "Ready to Activate" :
-                             "Pending"}
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"}`}>
+                            {sub.status === "active" ? "Active" : "Pending"}
                           </span>
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
                           {plan && <>
                             <div><dt className="text-muted-foreground">Rate limit</dt><dd className="font-medium">{plan.rateLimit}</dd></div>
                             <div><dt className="text-muted-foreground">Monthly quota</dt><dd className="font-medium">{plan.monthlyQuota}</dd></div>
+                            <div><dt className="text-muted-foreground">SLA</dt><dd className="font-medium">{plan.sla}</dd></div>
                           </>}
                           <div><dt className="text-muted-foreground">Requested</dt><dd className="font-medium">{new Date(sub.requestedAt).toLocaleDateString()}</dd></div>
                         </dl>
                         {sub.status === "active" && sub.apiKey && (
-                          <div className="mt-4 space-y-2">
-                            <div className="rounded-lg border bg-muted/50 p-3">
-                              <p className="mb-1 text-xs font-medium text-muted-foreground">Current API Key</p>
-                              <div className="flex items-center">
-                                <MaskedKey value={sub.apiKey} />
-                                <CopyButton text={sub.apiKey} />
-                                <button
-                                  onClick={() => handleRollKey(sub)}
-                                  disabled={rollingKey === sub.id}
-                                  className="border text-xs px-2 py-0.5 rounded hover:bg-muted transition-colors ml-2 disabled:opacity-60"
-                                >
-                                  {rollingKey === sub.id ? "Rolling…" : "Roll Key"}
-                                </button>
-                              </div>
-
+                          <div className="mt-4 rounded-lg border bg-muted/50 p-3">
+                            <p className="mb-1 text-xs font-medium text-muted-foreground">API Key</p>
+                            <div className="flex items-center">
+                              <code className="flex-1 truncate text-sm font-mono">{sub.apiKey}</code>
+                              <CopyButton text={sub.apiKey} />
                             </div>
-                            {sub.oldKeyExpiry && new Date(sub.oldKeyExpiry) > new Date() && (
-                              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                                ⚠️ <strong>Previous key expires</strong> {new Date(sub.oldKeyExpiry).toLocaleString()} — update your integration before then.
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {sub.status === "suspended" && (
-                          <div className="mt-4 flex items-center gap-2 text-sm text-orange-700 dark:text-orange-400 rounded-lg border border-orange-300 bg-orange-50 dark:border-orange-700 dark:bg-orange-950 px-3 py-2">
-                            ⏸️ Your API access has been suspended. Contact your Forest River representative.
                           </div>
                         )}
                         {sub.status === "pending" && (
                           <div className="mt-4 flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
                             <span className="animate-pulse">⏳</span> Waiting for admin approval — checking every 5 seconds…
-                          </div>
-                        )}
-                        {sub.status === "approved_pending_payment" && (
-                          <div className="mt-4 rounded-lg border border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950 p-4">
-                            <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-3">
-                              ✅ Access approved — complete your subscription to receive your API key
-                            </p>
-                            <button
-                              onClick={() => handleCompleteSubscription(sub)}
-                              disabled={completingCheckout === sub.id}
-                              className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
-                            >
-                              {completingCheckout === sub.id ? "Redirecting to Stripe…" : "Complete subscription →"}
-                            </button>
-                          </div>
-                        )}
-                        {sub.status === "approved" && (
-                          <div className="mt-4 rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950 p-4">
-                            <p className="text-sm font-medium text-green-800 dark:text-green-300 mb-3">
-                              ✅ Your access has been approved — subscribe to receive your API key
-                            </p>
-                            <a
-                              href="/pricing"
-                              className="inline-block rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors"
-                            >
-                              Subscribe now →
-                            </a>
                           </div>
                         )}
                       </div>

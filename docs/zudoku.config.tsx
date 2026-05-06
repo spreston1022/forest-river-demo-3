@@ -1,13 +1,11 @@
 import type { ZudokuConfig } from "zudoku";
-import { zuploMonetizationPlugin } from "@zuplo/zudoku-plugin-monetization";
+import { createApiIdentityPlugin } from "zudoku/plugins";
 import { SubscribePage } from "./SubscribePage";
 import { AdminPage } from "./AdminPage";
-import { SupportPage } from "./SupportPage";
-import { ChatWidget } from "./ChatWidget";
 
 const config: ZudokuConfig = {
   site: {
-    title: "Forest River",
+    title: "Forest River Developer Portal",
     logo: {
       src: {
         light: "https://www.forestriverinc.com/images/logo-reversed.png",
@@ -107,11 +105,18 @@ const config: ZudokuConfig = {
 
   navigation: [
     {
+      type: "doc",
+      file: "introduction",
+      path: "/",
+      label: "Home",
+      display: "hide",
+    },
+    {
       type: "category",
       label: "Documentation",
       icon: "book",
       items: [
-        { type: "doc", file: "introduction", path: "/", label: "Introduction" },
+        { type: "doc", file: "introduction", label: "Introduction" },
         { type: "doc", file: "quickstart", label: "Quick Start" },
         { type: "doc", file: "authentication", label: "Authentication" },
         { type: "doc", file: "migration-guide", label: "Migration Guide", icon: "alert-triangle" },
@@ -141,14 +146,6 @@ const config: ZudokuConfig = {
     },
     {
       type: "custom-page",
-      path: "/support",
-      label: "Support",
-      icon: "life-buoy",
-      element: <SupportPage />,
-      display: ({ auth }) => auth.isAuthenticated,
-    },
-    {
-      type: "custom-page",
       path: "/admin",
       label: "Admin",
       icon: "shield",
@@ -162,24 +159,18 @@ const config: ZudokuConfig = {
   ],
 
   plugins: [
-    zuploMonetizationPlugin({
-      pricing: {
-        title: "Forest River API Plans",
-        subtitle: "Choose the plan that fits your dealership's integration needs.",
-      },
+    createApiIdentityPlugin({
+      getIdentities: async (context) => [
+        {
+          id: "oauth-token",
+          label: "OAuth Token",
+          authorizeRequest: (request) => {
+            return context.authentication?.signRequest(request);
+          },
+        },
+      ],
     }),
   ],
-
-  slots: {
-    "head-navigation-start": (
-      <span className="flex items-center gap-3">
-        <span className="w-px h-5 bg-border" />
-        <span className="font-bold text-xl tracking-wide text-primary">Forest River</span>
-      </span>
-    ),
-    "head-navigation-end": <ChatWidget />,
-  },
-
 };
 
 export default config;
