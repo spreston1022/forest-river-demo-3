@@ -52,7 +52,7 @@ export function ChatWidget() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch the user's active API key from their subscription on mount
+  // Fetch the user's active API key whenever the widget opens
   useEffect(() => {
     if (!auth.isAuthenticated || !authentication) return;
     (async () => {
@@ -66,7 +66,7 @@ export function ChatWidget() {
         if (active) setDealerKey(active.apiKey);
       } catch {}
     })();
-  }, [auth.isAuthenticated, authentication]);
+  }, [auth.isAuthenticated, authentication, open]);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
