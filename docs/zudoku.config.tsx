@@ -1,4 +1,5 @@
 import type { ZudokuConfig } from "zudoku";
+import { zuploMonetizationPlugin } from "@zuplo/zudoku-plugin-monetization";
 import { SubscribePage } from "./SubscribePage";
 import { AdminPage } from "./AdminPage";
 import { SupportPage } from "./SupportPage";
@@ -158,6 +159,15 @@ const config: ZudokuConfig = {
         return roles.includes("api-admin");
       },
     },
+  ],
+
+  plugins: [
+    zuploMonetizationPlugin({
+      pricing: {
+        title: "Forest River API Plans",
+        subtitle: "Choose the plan that fits your dealership's integration needs.",
+      },
+    }),
   ],
 
   slots: {

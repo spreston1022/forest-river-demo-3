@@ -9,6 +9,7 @@
     "preview": "zudoku preview"
   },
   "dependencies": {
-    "zudoku": "latest"
+    "zudoku": "latest",
+    "@zuplo/zudoku-plugin-monetization": "latest"
   }
 }
