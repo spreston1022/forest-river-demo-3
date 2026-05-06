@@ -344,7 +344,7 @@
         "pathMode": "open-api"
       },
       "get": {
-        "summary": "Admin — get maintenance mode state",
+        "summary": "Admin \u2014 get maintenance mode state",
         "operationId": "admin-get-maintenance",
         "x-internal": true,
         "x-zuplo-route": {
@@ -373,7 +373,7 @@
         }
       },
       "post": {
-        "summary": "Admin — enable or disable maintenance mode",
+        "summary": "Admin \u2014 enable or disable maintenance mode",
         "operationId": "admin-set-maintenance",
         "x-internal": true,
         "x-zuplo-route": {
@@ -407,7 +407,7 @@
         "pathMode": "open-api"
       },
       "post": {
-        "summary": "Stripe webhook — provision key after checkout",
+        "summary": "Stripe webhook \u2014 provision key after checkout",
         "operationId": "stripe-webhook",
         "x-internal": true,
         "x-zuplo-route": {
@@ -483,6 +483,36 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/ai/chat": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "AI Chat \u2014 OpenAI proxy via Zuplo MCP",
+        "operationId": "ai-chat",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "aiChatHandler",
+            "module": "$import(./modules/ai-chat)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OpenAI response"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
