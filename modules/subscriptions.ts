@@ -376,6 +376,7 @@ function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
     status: (c.tags?.["status"] ?? "pending") as string,
     apiKey,
     oldKeyExpiry: c.tags?.["oldKeyExpiry"] ?? "",
+    oldKey: (c.tags?.["oldKeyExpiry"] && new Date(c.tags["oldKeyExpiry"]) > new Date()) ? (c.metadata?.["oldKeyValue"] ?? "") : "",
     requestedAt: c.metadata?.["requestedAt"] ?? new Date().toISOString(),
     resolvedAt: c.metadata?.["resolvedAt"],
     portalMessage: c.metadata?.["portalMessage"] ?? "",
@@ -455,7 +456,9 @@ export async function getMySubscriptions(request: ZuploRequest, context: ZuploCo
   const subscriptions = await Promise.all(mine.map(async (c) => {
     try {
       const withKey = await getConsumerWithKey(c.name);
-      const apiKey = withKey.tags?.["status"] === "active" ? withKey.apiKeys?.[0]?.key : undefined;
+      const oldKeyId = withKey.tags?.["oldKeyId"] ?? "";
+      const activeKeyEntry = withKey.apiKeys?.find(k => k.id !== oldKeyId) ?? withKey.apiKeys?.[0];
+      const apiKey = withKey.tags?.["status"] === "active" ? activeKeyEntry?.key : undefined;
       return consumerToSubscription(withKey, apiKey);
     } catch { return consumerToSubscription(c); }
   }));
@@ -774,7 +777,7 @@ export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Self-rolled key — " + new Date().toISOString() }) as { key: string; id: string };
   await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, oldKeyId, oldKeyExpiry },
-    metadata: { ...existing.metadata, keyRolledAt: new Date().toISOString() },
+    metadata: { ...existing.metadata, keyRolledAt: new Date().toISOString(), oldKeyValue },
   });
 
   const email = existing.metadata?.["email"] ?? "";
