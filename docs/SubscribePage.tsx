@@ -72,9 +72,21 @@ function QuotaBar({ apiKey, planId }: { apiKey: string; planId: string }) {
       .then((res) => {
         const allHeaders: Record<string, string> = {};
         res.headers.forEach((value, key) => { allHeaders[key] = value; });
-        console.log("[QuotaBar] probe response headers:", allHeaders);
-        const remaining = parseInt(res.headers.get("RateLimit-Remaining") ?? res.headers.get("X-RateLimit-Remaining") ?? "");
-        const limit = parseInt(res.headers.get("RateLimit-Limit") ?? res.headers.get("X-RateLimit-Limit") ?? "");
+        console.log("[QuotaBar] status:", res.status, "headers:", allHeaders);
+        const remaining = parseInt(
+          res.headers.get("RateLimit-Remaining") ??
+          res.headers.get("X-RateLimit-Remaining") ??
+          res.headers.get("x-ratelimit-remaining") ??
+          res.headers.get("ratelimit-remaining") ??
+          res.headers.get("X-Rate-Limit-Remaining") ?? ""
+        );
+        const limit = parseInt(
+          res.headers.get("RateLimit-Limit") ??
+          res.headers.get("X-RateLimit-Limit") ??
+          res.headers.get("x-ratelimit-limit") ??
+          res.headers.get("ratelimit-limit") ??
+          res.headers.get("X-Rate-Limit-Limit") ?? ""
+        );
         console.log("[QuotaBar] remaining:", remaining, "limit:", limit);
         if (!isNaN(remaining) && !isNaN(limit) && limit > 0) {
           setQuota({ remaining, limit });
