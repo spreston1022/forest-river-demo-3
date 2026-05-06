@@ -482,26 +482,11 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
     return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
   }
 
-  // Free plans: create Stripe customer + $0 subscription, then provision key
-  let stripeCustomerId = existing.metadata?.["stripeCustomerId"];
-  if (!stripeCustomerId) {
-    stripeCustomerId = await createStripeCustomer(email, company);
-    await zuploPatch(`/consumers/${consumerName}`, {
-      tags: { ...existing.tags },
-      metadata: { ...existing.metadata, stripeCustomerId },
-    });
-  }
-  const priceId = STRIPE_PRICE_IDS[planId];
-  if (!priceId) {
-    return new Response(JSON.stringify({ error: "No price configured for plan: " + planId }), { status: 500 });
-  }
-  const stripeSubscriptionId = await createStripeSubscription(stripeCustomerId, priceId);
-  const userId = existing.metadata?.["userId"] ?? "";
-  await createZuploMeteringSubscription(consumerName, userId, email, company, planId, stripeCustomerId, stripeSubscriptionId, context);
+  // Free plans: provision key immediately, no Stripe
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Approved subscription key" }) as { key: string };
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, status: "active" },
-    metadata: { ...existing.metadata, stripeCustomerId, stripeSubscriptionId, resolvedAt: new Date().toISOString() },
+    metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
   if (email) context.waitUntil(sendEmail(email, "Your " + plan + " API Access is Approved", approvalHtml(company, plan, keyData.key), context));
   return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -574,12 +559,6 @@ export async function handleStripeWebhook(request: ZuploRequest, context: ZuploC
         const existing = await getConsumerWithKey(consumerName);
         if (existing.tags?.["status"] === "approved_pending_payment") {
           const stripeSubscriptionId = (session["subscription"] as string) ?? "";
-          const stripeCustomerId = existing.metadata?.["stripeCustomerId"] ?? (session["customer"] as string) ?? "";
-          const userId = existing.metadata?.["userId"] ?? "";
-          const planId = existing.tags?.["plan"] ?? "";
-          const webhookEmail = existing.metadata?.["email"] ?? "";
-          const webhookCompany = existing.metadata?.["companyName"] || webhookEmail || "Dealer";
-          await createZuploMeteringSubscription(consumerName, userId, webhookEmail, webhookCompany, planId, stripeCustomerId, stripeSubscriptionId, context);
           const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Subscription key" }) as { key: string };
           await zuploPatch(`/consumers/${consumerName}`, {
             tags: { ...existing.tags, status: "active" },
