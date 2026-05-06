@@ -492,6 +492,37 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
   return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
+/** POST /subscriptions/complete — called by frontend after Stripe redirect */
+export async function completeCheckout(request: ZuploRequest, context: ZuploContext) {
+  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  const userId = request.user.sub!;
+  const body = await request.json() as { subscriptionId: string };
+  const consumerName = body.subscriptionId;
+
+  const existing = await getConsumerWithKey(consumerName);
+  if (existing.metadata?.["userId"] !== userId) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+  }
+  if (existing.tags?.["status"] !== "approved_pending_payment") {
+    // Already active — return current state
+    const apiKey = existing.tags?.["status"] === "active" ? existing.apiKeys?.[0]?.key : undefined;
+    return new Response(JSON.stringify(consumerToSubscription(existing, apiKey)), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
+  const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Subscription key" }) as { key: string };
+  const updated = await zuploPatch(`/consumers/${consumerName}`, {
+    tags: { ...existing.tags, status: "active" },
+    metadata: { ...existing.metadata, resolvedAt: new Date().toISOString() },
+  }) as ZuploConsumer;
+
+  const email = existing.metadata?.["email"] ?? "";
+  const company = existing.metadata?.["companyName"] || email || "Dealer";
+  const plan = existing.metadata?.["planName"] ?? "API";
+  if (email) context.waitUntil(sendEmail(email, "Your " + plan + " API Access is Now Active", approvalHtml(company, plan, keyData.key), context));
+
+  return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
 /** POST /subscriptions/checkout */
 export async function createCheckoutSession(request: ZuploRequest, context: ZuploContext) {
   if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
