@@ -74,7 +74,7 @@ function QuotaBar({ apiKey }: { apiKey: string }) {
     })();
   }, [apiKey]);
 
-  if (error || !quota) return null;
+  if (error || !quota) return <div className="mt-3 text-xs text-muted-foreground">Quota unavailable</div>;
 
   const used = quota.limit - quota.remaining;
   const pct = Math.min((used / quota.limit) * 100, 100);
