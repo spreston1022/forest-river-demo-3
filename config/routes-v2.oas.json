@@ -1217,6 +1217,26 @@
               }
             }
           }
+        },
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "urlForwardHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
+          },
+          "policies": {
+            "inbound": [
+              "kill-switch-vehicles",
+              "api-key-inbound",
+              "revocation-check-inbound",
+              "plan-access-catalog",
+              "plan-rate-limit-inbound",
+              "plan-quota-inbound"
+            ]
+          }
         }
       }
     }
