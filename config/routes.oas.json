@@ -734,12 +734,12 @@
         }
       }
     },
-    "/admin/subscriptions/{id}/offboard": {
+    "/admin/subscriptions/{id}": {
       "x-zuplo-path": {
         "pathMode": "open-api"
       },
-      "post": {
-        "summary": "Admin \u2014 offboard consumer",
+      "delete": {
+        "summary": "Admin \u2014 fully offboard a consumer",
         "operationId": "admin-offboard-subscription",
         "x-internal": true,
         "x-zuplo-route": {
@@ -757,7 +757,7 @@
         },
         "responses": {
           "200": {
-            "description": "Consumer offboarded"
+            "description": "Consumer deleted and offboarding email sent"
           },
           "401": {
             "description": "Unauthorized"
