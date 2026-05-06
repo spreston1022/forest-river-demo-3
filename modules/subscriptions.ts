@@ -18,15 +18,6 @@ const STRIPE_PRICE_IDS: Record<string, string> = {
 };
 
 const METERING_BUCKET_ID = "bckt_2vednH8xqLal1GgMI5pLSoQQdHhxV5Fjt";
-const ZUDOKU_METERING_DEPLOYMENT = "forest-river-demo-main-fb06bf1";
-
-// Native monetization plan IDs (from Zuplo dashboard — different from metering API plan IDs)
-const METERING_PLAN_IDS: Record<string, string> = {
-  catalog:    "01KQX0MV12JHJ042MT2W28N9Z2",
-  commerce:   "01KQX0YFRGYYX6DT7MZ0W79P75",
-  pro:        "01KQX0RCAZ3EDEGBFKE7GN80XW",
-  enterprise: "01KQX0TVK98FHEWYYAWSTTQM83",
-};
 
 // ─── Email via Resend ─────────────────────────────────────────────────────────
 
@@ -65,18 +56,6 @@ function approvedPendingPaymentHtml(companyName: string, planName: string): stri
     + "<p>Hi " + companyName + ",</p>"
     + "<p>Your request for <strong>" + planName + " Plan</strong> access has been approved. Complete your subscription to receive your API key.</p>"
     + "<p><a href='" + PORTAL_URL + "/my-subscriptions' style='display:inline-block;background:#026957;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold'>Complete Subscription →</a></p>"
-    + "<hr style='border:none;border-top:1px solid #e2e2e2;margin:24px 0'/>"
-    + "<p style='font-size:12px;color:#666'>Questions? Visit the <a href='" + PORTAL_URL + "' style='color:#026957'>Forest River Developer Portal</a></p>"
-    + "</body></html>";
-}
-
-function approvedActivateHtml(companyName: string, planName: string): string {
-  return "<html><body style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
-    + "<div style='background:#026957;padding:24px;margin-bottom:24px'><h1 style='color:#fff;margin:0;font-size:20px'>Forest River Developer Portal</h1></div>"
-    + "<h2 style='color:#026957'>Your Access Has Been Approved</h2>"
-    + "<p>Hi " + companyName + ",</p>"
-    + "<p>Your request for <strong>" + planName + " Plan</strong> access has been approved. Visit your subscriptions page to activate and receive your API key.</p>"
-    + "<p><a href='" + PORTAL_URL + "/my-subscriptions' style='display:inline-block;background:#026957;color:#fff;padding:12px 24px;text-decoration:none;font-weight:bold'>Activate My API Key →</a></p>"
     + "<hr style='border:none;border-top:1px solid #e2e2e2;margin:24px 0'/>"
     + "<p style='font-size:12px;color:#666'>Questions? Visit the <a href='" + PORTAL_URL + "' style='color:#026957'>Forest River Developer Portal</a></p>"
     + "</body></html>";
@@ -237,14 +216,6 @@ async function meteringPut(path: string, body: unknown): Promise<any> {
   return res.json();
 }
 
-async function getPlanUlidByKey(planKey: string): Promise<string> {
-  const data = await meteringGet("/plans");
-  const plans: any[] = data.items ?? data;
-  const plan = plans.find((p: any) => p.key === planKey);
-  if (!plan) throw new Error(`Metering plan not found for key: ${planKey}`);
-  return plan.id as string;
-}
-
 async function getOrCreateMeteringCustomer(
   consumerName: string,
   email: string,
@@ -386,8 +357,6 @@ function subToConsumerName(sub: string, planId: string): string {
 }
 
 function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
-  const status = c.tags?.["status"] ?? "pending";
-  const effectiveApiKey = apiKey ?? (status === "active" ? (c.metadata?.["activatedApiKey"] ?? c.apiKeys?.[0]?.key) : undefined);
   return {
     id: c.name,
     planId: c.tags?.["plan"] ?? "basic",
@@ -401,8 +370,8 @@ function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
     webhookUrl: c.metadata?.["webhookUrl"] ?? "",
     tosAccepted: c.metadata?.["tosAccepted"] === "true",
     tosAcceptedAt: c.metadata?.["tosAcceptedAt"] ?? "",
-    status: status as string,
-    apiKey: effectiveApiKey,
+    status: (c.tags?.["status"] ?? "pending") as string,
+    apiKey,
     oldKeyExpiry: c.tags?.["oldKeyExpiry"] ?? "",
     requestedAt: c.metadata?.["requestedAt"] ?? new Date().toISOString(),
     resolvedAt: c.metadata?.["resolvedAt"],
@@ -470,10 +439,7 @@ export async function getMySubscriptions(request: ZuploRequest, context: ZuploCo
   const subscriptions = await Promise.all(mine.map(async (c) => {
     try {
       const withKey = await getConsumerWithKey(c.name);
-      const status = withKey.tags?.["status"];
-      const apiKey = status === "active"
-        ? (withKey.metadata?.["activatedApiKey"] ?? withKey.apiKeys?.[0]?.key)
-        : undefined;
+      const apiKey = withKey.tags?.["status"] === "active" ? withKey.apiKeys?.[0]?.key : undefined;
       return consumerToSubscription(withKey, apiKey);
     } catch { return consumerToSubscription(c); }
   }));
@@ -516,22 +482,29 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
     return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
   }
 
-  // Free plans: create Stripe customer + $0 subscription, then mark approved for user to activate
+  // Free plans: create Stripe customer + $0 subscription, then provision key
   let stripeCustomerId = existing.metadata?.["stripeCustomerId"];
   if (!stripeCustomerId) {
     stripeCustomerId = await createStripeCustomer(email, company);
+    await zuploPatch(`/consumers/${consumerName}`, {
+      tags: { ...existing.tags },
+      metadata: { ...existing.metadata, stripeCustomerId },
+    });
   }
   const priceId = STRIPE_PRICE_IDS[planId];
   if (!priceId) {
     return new Response(JSON.stringify({ error: "No price configured for plan: " + planId }), { status: 500 });
   }
   const stripeSubscriptionId = await createStripeSubscription(stripeCustomerId, priceId);
+  const userId = existing.metadata?.["userId"] ?? "";
+  await createZuploMeteringSubscription(consumerName, userId, email, company, planId, stripeCustomerId, stripeSubscriptionId, context);
+  const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Approved subscription key" }) as { key: string };
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
-    tags: { ...existing.tags, status: "approved" },
+    tags: { ...existing.tags, status: "active" },
     metadata: { ...existing.metadata, stripeCustomerId, stripeSubscriptionId, resolvedAt: new Date().toISOString() },
   }) as ZuploConsumer;
-  if (email) context.waitUntil(sendEmail(email, "Your " + plan + " API Access Has Been Approved", approvedActivateHtml(company, plan), context));
-  return new Response(JSON.stringify(consumerToSubscription(updated)), { status: 200, headers: { "Content-Type": "application/json" } });
+  if (email) context.waitUntil(sendEmail(email, "Your " + plan + " API Access is Approved", approvalHtml(company, plan, keyData.key), context));
+  return new Response(JSON.stringify(consumerToSubscription(updated, keyData.key)), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
 /** POST /subscriptions/checkout */
@@ -602,21 +575,25 @@ export async function handleStripeWebhook(request: ZuploRequest, context: ZuploC
         if (existing.tags?.["status"] === "approved_pending_payment") {
           const stripeSubscriptionId = (session["subscription"] as string) ?? "";
           const stripeCustomerId = existing.metadata?.["stripeCustomerId"] ?? (session["customer"] as string) ?? "";
+          const userId = existing.metadata?.["userId"] ?? "";
+          const planId = existing.tags?.["plan"] ?? "";
+          const webhookEmail = existing.metadata?.["email"] ?? "";
+          const webhookCompany = existing.metadata?.["companyName"] || webhookEmail || "Dealer";
+          await createZuploMeteringSubscription(consumerName, userId, webhookEmail, webhookCompany, planId, stripeCustomerId, stripeSubscriptionId, context);
+          const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Subscription key" }) as { key: string };
+          await zuploPatch(`/consumers/${consumerName}`, {
+            tags: { ...existing.tags, status: "active" },
+            metadata: {
+              ...existing.metadata,
+              resolvedAt: new Date().toISOString(),
+              stripeSubscriptionId,
+            },
+          });
           const email = existing.metadata?.["email"] ?? "";
           const company = existing.metadata?.["companyName"] || email || "Dealer";
           const plan = existing.metadata?.["planName"] ?? "API";
-          // Payment confirmed — mark approved so user can activate via zudoku-metering
-          await zuploPatch(`/consumers/${consumerName}`, {
-            tags: { ...existing.tags, status: "approved" },
-            metadata: {
-              ...existing.metadata,
-              stripeCustomerId,
-              stripeSubscriptionId,
-              resolvedAt: new Date().toISOString(),
-            },
-          });
-          if (email) await sendEmail(email, "Your " + plan + " Access is Ready to Activate", approvedActivateHtml(company, plan), context);
-          context.log.info("Stripe checkout complete for " + consumerName + " — marked approved, awaiting user activation");
+          if (email) await sendEmail(email, "Your " + plan + " API Access is Now Active", approvalHtml(company, plan, keyData.key), context);
+          context.log.info("Key provisioned for " + consumerName + " after Stripe checkout");
         }
       } catch (err) {
         context.log.error("Failed to process checkout for " + consumerName + ": " + String(err));
@@ -724,18 +701,13 @@ export async function adminRollKey(request: ZuploRequest, context: ZuploContext)
   const oldKeyExpiry = new Date(Date.now() + gracePeriodHours * 60 * 60 * 1000).toISOString();
 
   const existing = await getConsumerWithKey(consumerName);
+  const oldKeyId = existing.apiKeys?.[0]?.id ?? "";
 
-  const activatedConsumerName = existing.metadata?.["activatedConsumerName"];
-  const targetConsumer = activatedConsumerName || consumerName;
-  const keyData = await zuploPost(`/consumers/${targetConsumer}/keys`, { description: "Rolled key — " + new Date().toISOString() }) as { key: string; id: string };
+  const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Rolled key — " + new Date().toISOString() }) as { key: string; id: string };
 
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
-    tags: { ...existing.tags, oldKeyExpiry },
-    metadata: {
-      ...existing.metadata,
-      ...(activatedConsumerName ? { activatedApiKey: keyData.key } : {}),
-      keyRolledAt: new Date().toISOString(),
-    },
+    tags: { ...existing.tags, oldKeyId, oldKeyExpiry },
+    metadata: { ...existing.metadata, keyRolledAt: new Date().toISOString() },
   }) as ZuploConsumer;
 
   const email = existing.metadata?.["email"] ?? "";
@@ -759,70 +731,6 @@ export async function adminOffboardSubscription(request: ZuploRequest, context: 
   return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
-/** POST /subscriptions/:id/activate — user activates an approved subscription via zudoku-metering */
-export async function activateSubscription(request: ZuploRequest, context: ZuploContext) {
-  if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-  const userId = request.user.sub!;
-  const consumerName = request.params.id;
-
-  const existing = await getConsumerWithKey(consumerName);
-  if (existing.metadata?.["userId"] !== userId) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
-  }
-  if (existing.tags?.["status"] !== "approved") {
-    return new Response(JSON.stringify({ error: "Subscription not awaiting activation" }), { status: 400 });
-  }
-  // Idempotent: if already activated, return existing key
-  if (existing.metadata?.["activatedApiKey"]) {
-    return new Response(JSON.stringify(consumerToSubscription(existing)), { status: 200, headers: { "Content-Type": "application/json" } });
-  }
-
-  const planId = existing.tags?.["plan"] ?? "";
-  const userJwt = request.headers.get("Authorization") ?? "";
-
-  const planUlid = planId; // pass key directly — zudoku-metering may use key, not ULID
-  context.log.info(`Activating plan "${planId}" with zudoku-metering planId: ${planUlid}`);
-
-  // Call zudoku-metering with the user's JWT — this creates the internal consumer+key+subscription link
-  const meteringRes = await fetch(
-    `https://api.zuploedge.com/v3/zudoku-metering/${ZUDOKU_METERING_DEPLOYMENT}/subscriptions`,
-    {
-      method: "POST",
-      headers: { Authorization: userJwt, "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: planUlid }),
-    },
-  );
-
-  if (!meteringRes.ok) {
-    const errText = await meteringRes.text();
-    context.log.error(`zudoku-metering activation failed (${meteringRes.status}): ${errText}`);
-    return new Response(JSON.stringify({ error: `Activation failed (${meteringRes.status}): ${errText}` }), { status: 502 });
-  }
-
-  const meteringData = await meteringRes.json() as { consumer?: { name?: string; apiKeys?: { key: string }[] }; status?: string };
-  const activatedApiKey = meteringData.consumer?.apiKeys?.[0]?.key ?? "";
-  const activatedConsumerName = meteringData.consumer?.name ?? "";
-  context.log.info(`Activated subscription for ${consumerName}: zudoku consumer=${activatedConsumerName} key=${activatedApiKey.slice(0, 8)}...`);
-
-  const email = existing.metadata?.["email"] ?? "";
-  const company = existing.metadata?.["companyName"] || email || "Dealer";
-  const plan = existing.metadata?.["planName"] ?? "API";
-
-  const updated = await zuploPatch(`/consumers/${consumerName}`, {
-    tags: { ...existing.tags, status: "active" },
-    metadata: {
-      ...existing.metadata,
-      activatedApiKey,
-      activatedConsumerName,
-      activatedAt: new Date().toISOString(),
-    },
-  }) as ZuploConsumer;
-
-  if (email) context.waitUntil(sendEmail(email, "Your " + plan + " API Key is Ready", approvalHtml(company, plan, activatedApiKey), context));
-
-  return new Response(JSON.stringify(consumerToSubscription(updated, activatedApiKey)), { status: 200, headers: { "Content-Type": "application/json" } });
-}
-
 /** POST /subscriptions/roll-key  body: { subscriptionId: string } — consumer self-service */
 export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {
   if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
@@ -833,21 +741,14 @@ export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {
   if (existing.metadata?.["userId"] !== userId) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   if (existing.tags?.["status"] !== "active") return new Response(JSON.stringify({ error: "Subscription not active" }), { status: 400 });
 
+  const oldKeyId = existing.apiKeys?.[0]?.id ?? "";
   const gracePeriodHours = 1;
   const oldKeyExpiry = new Date(Date.now() + gracePeriodHours * 60 * 60 * 1000).toISOString();
 
-  // For zudoku-metering-activated consumers, create the new key on the activated consumer
-  const activatedConsumerName = existing.metadata?.["activatedConsumerName"];
-  const targetConsumer = activatedConsumerName || consumerName;
-  const keyData = await zuploPost(`/consumers/${targetConsumer}/keys`, { description: "Self-rolled key — " + new Date().toISOString() }) as { key: string; id: string };
-
+  const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Self-rolled key — " + new Date().toISOString() }) as { key: string; id: string };
   await zuploPatch(`/consumers/${consumerName}`, {
-    tags: { ...existing.tags, oldKeyExpiry },
-    metadata: {
-      ...existing.metadata,
-      ...(activatedConsumerName ? { activatedApiKey: keyData.key } : {}),
-      keyRolledAt: new Date().toISOString(),
-    },
+    tags: { ...existing.tags, oldKeyId, oldKeyExpiry },
+    metadata: { ...existing.metadata, keyRolledAt: new Date().toISOString() },
   });
 
   const email = existing.metadata?.["email"] ?? "";
