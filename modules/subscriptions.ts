@@ -190,17 +190,51 @@ async function verifyStripeWebhook(payload: string, sig: string, secret: string)
 
 const METERING_BASE = `https://dev.zuplo.com/v3/metering/${METERING_BUCKET_ID}`;
 
-async function meteringFetch(path: string, body: unknown): Promise<any> {
+function meteringHeaders() {
+  return { Authorization: `Bearer ${environment.API_KEY}`, "Content-Type": "application/json" };
+}
+
+async function meteringPost(path: string, body: unknown): Promise<any> {
   const res = await fetch(`${METERING_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${environment.API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+    method: "POST", headers: meteringHeaders(), body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Metering ${path} failed: ${await res.text()}`);
+  if (!res.ok) throw new Error(`Metering POST ${path} failed: ${await res.text()}`);
   return res.json();
+}
+
+async function meteringGet(path: string): Promise<any> {
+  const res = await fetch(`${METERING_BASE}${path}`, { headers: meteringHeaders() });
+  if (!res.ok) throw new Error(`Metering GET ${path} failed: ${await res.text()}`);
+  return res.json();
+}
+
+async function getOrCreateMeteringCustomer(
+  consumerName: string,
+  userId: string,
+  email: string,
+  companyName: string,
+  context: ZuploContext,
+): Promise<string> {
+  try {
+    const customer = await meteringPost("/customers", {
+      name: companyName || email || consumerName,
+      primaryEmail: email || undefined,
+      key: userId,
+      usageAttribution: { subjectKeys: [consumerName] },
+    });
+    context.log.info(`Metering customer created: ${customer.id}`);
+    return customer.id as string;
+  } catch (err) {
+    const msg = String(err);
+    if (!msg.includes("409") && !msg.includes("Conflict")) throw err;
+    // Customer already exists — fetch it by key
+    const list = await meteringGet(`/customers?key=${encodeURIComponent(userId)}`);
+    const items: any[] = list.items ?? list;
+    const existing = items.find((c: any) => c.key === userId);
+    if (!existing) throw new Error(`Metering customer with key ${userId} not found after 409`);
+    context.log.info(`Metering customer already exists: ${existing.id}`);
+    return existing.id as string;
+  }
 }
 
 async function createZuploMeteringSubscription(
@@ -212,23 +246,8 @@ async function createZuploMeteringSubscription(
   stripeCustomerId: string,
   context: ZuploContext,
 ): Promise<void> {
-  // Step 1: create (or retrieve) a metering customer whose usageAttribution
-  // points to the consumer name — this is how the monetization-inbound policy
-  // links an incoming API key to a subscription.
-  const customer = await meteringFetch("/customers", {
-    name: companyName || email || consumerName,
-    primaryEmail: email || undefined,
-    key: userId,
-    usageAttribution: { subjectKeys: [consumerName] },
-  });
-  context.log.info(`Metering customer created: ${customer.id} for ${consumerName}`);
-
-  // Step 2: create the subscription using the internal ULID from step 1.
-  await meteringFetch("/subscriptions", {
-    customerId: customer.id,
-    planKey,
-    stripeCustomerId,
-  });
+  const customerId = await getOrCreateMeteringCustomer(consumerName, userId, email, companyName, context);
+  await meteringPost("/subscriptions", { customerId, planKey, stripeCustomerId });
   context.log.info(`Metering subscription created: ${consumerName} on plan ${planKey}`);
 }
 
