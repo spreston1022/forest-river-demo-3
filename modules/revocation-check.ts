@@ -40,7 +40,7 @@ export default async function(request: ZuploRequest, context: ZuploContext) {
         await fetch(`${BASE}/${bucket}/consumers/${consumerName}`, {
           method: "PATCH",
           headers: zuploHeaders(),
-          body: JSON.stringify({ tags: { ...tags, oldKeyId: "", oldKeyExpiry: "" } }),
+          body: JSON.stringify({ tags: { ...tags, oldKeyId: "", oldKeyExpiry: "" }, metadata: { oldKeyValue: "" } }),
         });
       } catch (err) {
         context.log.warn("Lazy cleanup failed for consumer " + consumerName + ": " + err);

@@ -376,6 +376,7 @@ function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
     status: (c.tags?.["status"] ?? "pending") as string,
     apiKey,
     oldKeyExpiry: c.tags?.["oldKeyExpiry"] ?? "",
+    oldKey: (c.tags?.["oldKeyExpiry"] && new Date(c.tags["oldKeyExpiry"]) > new Date()) ? (c.metadata?.["oldKeyValue"] ?? "") : "",
     requestedAt: c.metadata?.["requestedAt"] ?? new Date().toISOString(),
     resolvedAt: c.metadata?.["resolvedAt"],
     portalMessage: c.metadata?.["portalMessage"] ?? "",
@@ -774,7 +775,7 @@ export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Self-rolled key — " + new Date().toISOString() }) as { key: string; id: string };
   await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, oldKeyId, oldKeyExpiry },
-    metadata: { ...existing.metadata, keyRolledAt: new Date().toISOString() },
+    metadata: { ...existing.metadata, keyRolledAt: new Date().toISOString(), oldKeyValue },
   });
 
   const email = existing.metadata?.["email"] ?? "";
