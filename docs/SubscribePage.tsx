@@ -530,10 +530,10 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                         )}
                         {sub?.status === "approved" && (
                           <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
-                            <p className="text-xs font-medium text-green-800 dark:text-green-300 mb-1.5">✅ Approved — activate to get your API key</p>
-                            <button onClick={() => setView("subscriptions")} className="text-xs text-green-700 dark:text-green-400 underline hover:no-underline">
-                              Activate now →
-                            </button>
+                            <p className="text-xs font-medium text-green-800 dark:text-green-300 mb-1.5">✅ Approved — subscribe to get your API key</p>
+                            <a href="/pricing" className="text-xs text-green-700 dark:text-green-400 underline hover:no-underline">
+                              Subscribe now →
+                            </a>
                           </div>
                         )}
                       </div>
@@ -660,15 +660,14 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                         {sub.status === "approved" && (
                           <div className="mt-4 rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950 p-4">
                             <p className="text-sm font-medium text-green-800 dark:text-green-300 mb-3">
-                              ✅ Your access has been approved — click below to activate and get your API key
+                              ✅ Your access has been approved — subscribe to receive your API key
                             </p>
-                            <button
-                              onClick={() => handleActivate(sub)}
-                              disabled={activating === sub.id}
-                              className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                            <a
+                              href="/pricing"
+                              className="inline-block rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors"
                             >
-                              {activating === sub.id ? "Activating…" : "Activate API Key →"}
-                            </button>
+                              Subscribe now →
+                            </a>
                           </div>
                         )}
                       </div>
