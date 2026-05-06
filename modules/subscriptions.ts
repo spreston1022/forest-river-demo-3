@@ -20,6 +20,14 @@ const STRIPE_PRICE_IDS: Record<string, string> = {
 const METERING_BUCKET_ID = "bckt_2vednH8xqLal1GgMI5pLSoQQdHhxV5Fjt";
 const ZUDOKU_METERING_DEPLOYMENT = "forest-river-demo-main-fb06bf1";
 
+// Native monetization plan IDs (from Zuplo dashboard — different from metering API plan IDs)
+const METERING_PLAN_IDS: Record<string, string> = {
+  catalog:    "01KQX0MV12JHJ042MT2W28N9Z2",
+  commerce:   "01KQX0YFRGYYX6DT7MZ0W79P75",
+  pro:        "01KQX0RCAZ3EDEGBFKE7GN80XW",
+  enterprise: "01KQX0TVK98FHEWYYAWSTTQM83",
+};
+
 // ─── Email via Resend ─────────────────────────────────────────────────────────
 
 async function sendEmail(to: string, subject: string, html: string, context: ZuploContext): Promise<void> {
@@ -772,15 +780,12 @@ export async function activateSubscription(request: ZuploRequest, context: Zuplo
   const planId = existing.tags?.["plan"] ?? "";
   const userJwt = request.headers.get("Authorization") ?? "";
 
-  // Look up the metering plan ULID by human-readable key
-  let planUlid: string;
-  try {
-    planUlid = await getPlanUlidByKey(planId);
-    context.log.info(`Resolved plan key "${planId}" to ULID: ${planUlid}`);
-  } catch (err) {
-    context.log.error(`Failed to look up metering plan ULID for key "${planId}": ${String(err)}`);
-    return new Response(JSON.stringify({ error: `Unknown plan "${planId}" — ${String(err)}` }), { status: 400 });
+  const planUlid = METERING_PLAN_IDS[planId];
+  if (!planUlid) {
+    context.log.error(`No native monetization plan ID configured for key "${planId}"`);
+    return new Response(JSON.stringify({ error: `Unknown plan "${planId}"` }), { status: 400 });
   }
+  context.log.info(`Activating plan "${planId}" with zudoku-metering plan ID: ${planUlid}`);
 
   // Call zudoku-metering with the user's JWT — this creates the internal consumer+key+subscription link
   const meteringRes = await fetch(
