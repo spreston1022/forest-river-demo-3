@@ -3,30 +3,70 @@
   "info": {
     "title": "Forest River API (v2)",
     "version": "2.0.0",
-    "description": "Current version of the Forest River Dealer API.\n\n**Breaking changes from v1:**\n- `dealerCode` replaced by `dealerId` (UUID) — aligns with new dealer management system\n- New `category` field on vehicles: Camping, Work & Play, Marine, or Specialty\n\nIf you are still on v1, please migrate before **May 30, 2026**."
+    "description": "Current version of the Forest River Dealer API.\n\n**Breaking changes from v1:**\n- `dealerCode` replaced by `dealerId` (UUID) \u2014 aligns with new dealer management system\n- New `category` field on vehicles: Camping, Work & Play, Marine, or Specialty\n\nIf you are still on v1, please migrate before **May 30, 2026**."
   },
   "paths": {
     "/v2/vehicles": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "get": {
         "summary": "List vehicles",
         "description": "Returns the Forest River product catalog. Filter by `category` or `type` to narrow results.",
         "operationId": "v2-list-vehicles",
-        "tags": ["Vehicles"],
+        "tags": [
+          "Vehicles"
+        ],
         "parameters": [
-          { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["Camping", "Work & Play", "Marine", "Specialty"] }, "description": "Filter by product category" },
-          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Filter by vehicle type (e.g. travel-trailer, fifth-wheel)" },
-          { "name": "year", "in": "query", "schema": { "type": "integer" }, "description": "Filter by model year" }
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Camping",
+                "Work & Play",
+                "Marine",
+                "Specialty"
+              ]
+            },
+            "description": "Filter by product category"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by vehicle type (e.g. travel-trailer, fifth-wheel)"
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter by model year"
+          }
         ],
         "x-zuplo-route": {
           "corsPolicy": "none",
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "baseUrl": "https://echo.zuplo.io" }
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
           },
           "policies": {
-            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+            "inbound": [
+              "kill-switch-vehicles",
+              "api-key-inbound",
+              "revocation-check-inbound",
+              "plan-access-catalog",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ]
           }
         },
         "responses": {
@@ -36,7 +76,9 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/Vehicle" }
+                  "items": {
+                    "$ref": "#/components/schemas/Vehicle"
+                  }
                 },
                 "examples": {
                   "vehicle-list": {
@@ -58,7 +100,11 @@
                         "weight": 7245,
                         "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
                         "available": true,
-                        "features": ["Solar-ready", "Outdoor kitchen", "King bed"]
+                        "features": [
+                          "Solar-ready",
+                          "Outdoor kitchen",
+                          "King bed"
+                        ]
                       },
                       {
                         "id": "veh-002",
@@ -76,7 +122,11 @@
                         "weight": 15820,
                         "dealerId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                         "available": true,
-                        "features": ["Garage suite", "Residential fridge", "Theater seating"]
+                        "features": [
+                          "Garage suite",
+                          "Residential fridge",
+                          "Theater seating"
+                        ]
                       },
                       {
                         "id": "veh-003",
@@ -94,7 +144,11 @@
                         "weight": 9200,
                         "dealerId": "f9e8d7c6-b5a4-3210-fedc-ba9876543210",
                         "available": false,
-                        "features": ["15' garage", "Generator prep", "Outdoor shower"]
+                        "features": [
+                          "15' garage",
+                          "Generator prep",
+                          "Outdoor shower"
+                        ]
                       },
                       {
                         "id": "veh-004",
@@ -112,7 +166,11 @@
                         "weight": 33000,
                         "dealerId": "c3d4e5f6-a7b8-9012-cdef-012345678901",
                         "available": true,
-                        "features": ["Full-wall slide", "Aqua-Hot heating", "King master suite"]
+                        "features": [
+                          "Full-wall slide",
+                          "Aqua-Hot heating",
+                          "King master suite"
+                        ]
                       },
                       {
                         "id": "veh-005",
@@ -130,7 +188,11 @@
                         "weight": 3800,
                         "dealerId": "e5f6a7b8-c9d0-1234-efab-234567890123",
                         "available": true,
-                        "features": ["Twin Yamaha 115hp", "Live well", "GPS/Chartplotter"]
+                        "features": [
+                          "Twin Yamaha 115hp",
+                          "Live well",
+                          "GPS/Chartplotter"
+                        ]
                       },
                       {
                         "id": "veh-006",
@@ -148,7 +210,11 @@
                         "weight": 5890,
                         "dealerId": "d8f3a2b1-4c5e-4f6a-8b9c-1d2e3f4a5b6c",
                         "available": true,
-                        "features": ["Bunkhouse", "Rear cargo door", "Exterior grill"]
+                        "features": [
+                          "Bunkhouse",
+                          "Rear cargo door",
+                          "Exterior grill"
+                        ]
                       }
                     ]
                   }
@@ -156,33 +222,82 @@
               }
             }
           },
-          "401": { "description": "Unauthorized — invalid or missing API key" },
-          "429": { "description": "Rate limit exceeded" }
+          "401": {
+            "description": "Unauthorized \u2014 invalid or missing API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
         }
       }
     },
-
     "/v2/inventory": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "get": {
         "summary": "Get dealer inventory",
         "description": "Returns real-time inventory available at dealer locations. Includes units currently on the lot, in-transit, and on order.",
         "operationId": "v2-get-inventory",
-        "tags": ["Inventory"],
+        "tags": [
+          "Inventory"
+        ],
         "parameters": [
-          { "name": "dealerId", "in": "query", "schema": { "type": "string" }, "description": "Filter by specific dealer UUID" },
-          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["on-lot", "in-transit", "on-order", "sold"] }, "description": "Filter by inventory status" },
-          { "name": "category", "in": "query", "schema": { "type": "string", "enum": ["Camping", "Work & Play", "Marine", "Specialty"] }, "description": "Filter by product category" }
+          {
+            "name": "dealerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by specific dealer UUID"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "on-lot",
+                "in-transit",
+                "on-order",
+                "sold"
+              ]
+            },
+            "description": "Filter by inventory status"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Camping",
+                "Work & Play",
+                "Marine",
+                "Specialty"
+              ]
+            },
+            "description": "Filter by product category"
+          }
         ],
         "x-zuplo-route": {
           "corsPolicy": "none",
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "baseUrl": "https://echo.zuplo.io" }
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
           },
           "policies": {
-            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+            "inbound": [
+              "kill-switch-inventory",
+              "api-key-inbound",
+              "revocation-check-inbound",
+              "plan-access-catalog",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ]
           }
         },
         "responses": {
@@ -272,32 +387,62 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "429": { "description": "Rate limit exceeded" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
         }
       }
     },
-
     "/v2/dealers": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "get": {
         "summary": "List dealers",
         "description": "Returns the Forest River authorized dealer network. Filter by state or proximity.",
         "operationId": "v2-list-dealers",
-        "tags": ["Dealers"],
+        "tags": [
+          "Dealers"
+        ],
         "parameters": [
-          { "name": "state", "in": "query", "schema": { "type": "string" }, "description": "Filter by US state code (e.g. TX, CA)" },
-          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by product categories the dealer carries" }
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by US state code (e.g. TX, CA)"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by product categories the dealer carries"
+          }
         ],
         "x-zuplo-route": {
           "corsPolicy": "none",
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "baseUrl": "https://echo.zuplo.io" }
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
           },
           "policies": {
-            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+            "inbound": [
+              "kill-switch-dealers",
+              "api-key-inbound",
+              "revocation-check-inbound",
+              "plan-access-catalog",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ]
           }
         },
         "responses": {
@@ -317,8 +462,17 @@
                         "state": "IN",
                         "phone": "317-555-0100",
                         "email": "sales@abcrvdealer.com",
-                        "categories": ["Camping", "Work & Play", "Marine"],
-                        "brands": ["Rockwood", "Cherokee", "Surveyor", "Tidewater"],
+                        "categories": [
+                          "Camping",
+                          "Work & Play",
+                          "Marine"
+                        ],
+                        "brands": [
+                          "Rockwood",
+                          "Cherokee",
+                          "Surveyor",
+                          "Tidewater"
+                        ],
                         "certified": true,
                         "serviceCenter": true,
                         "established": 1998,
@@ -332,8 +486,15 @@
                         "state": "OH",
                         "phone": "614-555-0200",
                         "email": "info@midwestrv.com",
-                        "categories": ["Camping", "Specialty"],
-                        "brands": ["Berkshire", "Georgetown", "Flagstaff"],
+                        "categories": [
+                          "Camping",
+                          "Specialty"
+                        ],
+                        "brands": [
+                          "Berkshire",
+                          "Georgetown",
+                          "Flagstaff"
+                        ],
                         "certified": true,
                         "serviceCenter": true,
                         "established": 2003,
@@ -347,8 +508,16 @@
                         "state": "FL",
                         "phone": "813-555-0300",
                         "email": "sales@sunstaterv.com",
-                        "categories": ["Camping", "Marine", "Work & Play"],
-                        "brands": ["Tidewater", "Rockwood", "Work and Play"],
+                        "categories": [
+                          "Camping",
+                          "Marine",
+                          "Work & Play"
+                        ],
+                        "brands": [
+                          "Tidewater",
+                          "Rockwood",
+                          "Work and Play"
+                        ],
                         "certified": true,
                         "serviceCenter": false,
                         "established": 2010,
@@ -360,32 +529,53 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "429": { "description": "Rate limit exceeded" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
         }
       }
     },
-
     "/v2/orders": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "post": {
         "summary": "Submit an order",
         "description": "Submit a new vehicle order on behalf of a customer. Returns an order confirmation with tracking number.",
         "operationId": "v2-create-order",
-        "tags": ["Orders"],
+        "tags": [
+          "Orders"
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["inventoryId", "customerId", "dealerId"],
+                "required": [
+                  "inventoryId",
+                  "customerId",
+                  "dealerId"
+                ],
                 "properties": {
-                  "inventoryId": { "type": "string" },
-                  "customerId": { "type": "string" },
-                  "dealerId": { "type": "string" },
-                  "depositAmount": { "type": "number" },
-                  "notes": { "type": "string" }
+                  "inventoryId": {
+                    "type": "string"
+                  },
+                  "customerId": {
+                    "type": "string"
+                  },
+                  "dealerId": {
+                    "type": "string"
+                  },
+                  "depositAmount": {
+                    "type": "number"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
                 }
               },
               "examples": {
@@ -408,10 +598,19 @@
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "baseUrl": "https://echo.zuplo.io" }
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
           },
           "policies": {
-            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+            "inbound": [
+              "kill-switch-orders",
+              "api-key-inbound",
+              "revocation-check-inbound",
+              "plan-access-commerce",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ]
           }
         },
         "responses": {
@@ -442,29 +641,63 @@
               }
             }
           },
-          "400": { "description": "Invalid request" },
-          "401": { "description": "Unauthorized" },
-          "409": { "description": "Unit no longer available" },
-          "429": { "description": "Rate limit exceeded" }
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "Unit no longer available"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
         }
       },
       "get": {
         "summary": "List orders",
         "description": "Returns all orders associated with your dealer account.",
         "operationId": "v2-list-orders",
-        "tags": ["Orders"],
+        "tags": [
+          "Orders"
+        ],
         "parameters": [
-          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["pending", "confirmed", "in-production", "shipped", "delivered", "cancelled"] }, "description": "Filter by order status" }
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "confirmed",
+                "in-production",
+                "shipped",
+                "delivered",
+                "cancelled"
+              ]
+            },
+            "description": "Filter by order status"
+          }
         ],
         "x-zuplo-route": {
           "corsPolicy": "none",
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "baseUrl": "https://echo.zuplo.io" }
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
           },
           "policies": {
-            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+            "inbound": [
+              "kill-switch-orders",
+              "api-key-inbound",
+              "revocation-check-inbound",
+              "plan-access-commerce",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ]
           }
         },
         "responses": {
@@ -504,31 +737,55 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "429": { "description": "Rate limit exceeded" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
         }
       }
     },
-
     "/v2/orders/{orderId}": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "get": {
         "summary": "Get order status",
         "description": "Returns the current status and details for a specific order.",
         "operationId": "v2-get-order",
-        "tags": ["Orders"],
+        "tags": [
+          "Orders"
+        ],
         "parameters": [
-          { "name": "orderId", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Order ID returned at creation" }
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Order ID returned at creation"
+          }
         ],
         "x-zuplo-route": {
           "corsPolicy": "none",
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "baseUrl": "https://echo.zuplo.io" }
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
           },
           "policies": {
-            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+            "inbound": [
+              "kill-switch-orders",
+              "api-key-inbound",
+              "revocation-check-inbound",
+              "plan-access-commerce",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ]
           }
         },
         "responses": {
@@ -543,9 +800,18 @@
                       "orderId": "ord-2026-00891",
                       "status": "in-production",
                       "statusHistory": [
-                        { "status": "pending", "timestamp": "2026-04-30T14:23:11Z" },
-                        { "status": "confirmed", "timestamp": "2026-04-30T15:45:00Z" },
-                        { "status": "in-production", "timestamp": "2026-05-01T08:00:00Z" }
+                        {
+                          "status": "pending",
+                          "timestamp": "2026-04-30T14:23:11Z"
+                        },
+                        {
+                          "status": "confirmed",
+                          "timestamp": "2026-04-30T15:45:00Z"
+                        },
+                        {
+                          "status": "in-production",
+                          "timestamp": "2026-05-01T08:00:00Z"
+                        }
                       ],
                       "inventoryId": "inv-78234",
                       "sku": "RW-2892RB-2025",
@@ -570,33 +836,65 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "Order not found" },
-          "429": { "description": "Rate limit exceeded" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Order not found"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
         }
       }
     },
-
     "/v2/pricing": {
-      "x-zuplo-path": { "pathMode": "open-api" },
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
       "get": {
         "summary": "Get pricing",
         "description": "Returns current MSRP and dealer net pricing for vehicles. Dealer net pricing requires Pro or Enterprise plan.",
         "operationId": "v2-get-pricing",
-        "tags": ["Pricing"],
+        "tags": [
+          "Pricing"
+        ],
         "parameters": [
-          { "name": "sku", "in": "query", "schema": { "type": "string" }, "description": "Filter by specific SKU" },
-          { "name": "year", "in": "query", "schema": { "type": "integer" }, "description": "Filter by model year" }
+          {
+            "name": "sku",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by specific SKU"
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter by model year"
+          }
         ],
         "x-zuplo-route": {
           "corsPolicy": "none",
           "handler": {
             "export": "urlForwardHandler",
             "module": "$import(@zuplo/runtime)",
-            "options": { "baseUrl": "https://echo.zuplo.io" }
+            "options": {
+              "baseUrl": "https://echo.zuplo.io"
+            }
           },
           "policies": {
-            "inbound": ["api-key-inbound", "plan-rate-limit-inbound", "mock-api-inbound"]
+            "inbound": [
+              "kill-switch-pricing",
+              "api-key-inbound",
+              "revocation-check-inbound",
+              "plan-access-commerce",
+              "plan-rate-limit-inbound",
+              "mock-api-inbound"
+            ]
           }
         },
         "responses": {
@@ -669,35 +967,146 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "403": { "description": "Dealer net pricing requires Pro or Enterprise plan" },
-          "429": { "description": "Rate limit exceeded" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Dealer net pricing requires Pro or Enterprise plan"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "MCP Server",
+        "operationId": "mcp-server",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "mcpServerHandler",
+            "module": "$import(@zuplo/runtime)",
+            "options": {
+              "name": "forest-river-api",
+              "version": "1.0.0",
+              "operations": [
+                {
+                  "file": "./config/routes-v2.oas.json",
+                  "id": "v2-list-vehicles"
+                },
+                {
+                  "file": "./config/routes-v2.oas.json",
+                  "id": "v2-get-inventory"
+                },
+                {
+                  "file": "./config/routes-v2.oas.json",
+                  "id": "v2-list-dealers"
+                },
+                {
+                  "file": "./config/routes-v2.oas.json",
+                  "id": "v2-get-pricing"
+                },
+                {
+                  "file": "./config/routes-v2.oas.json",
+                  "id": "v2-list-orders"
+                },
+                {
+                  "file": "./config/routes-v2.oas.json",
+                  "id": "v2-get-order"
+                }
+              ]
+            }
+          },
+          "policies": {
+            "inbound": [
+              "mcp-query-param-to-header-inbound",
+              "api-key-inbound",
+              "revocation-check-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP response"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     }
   },
-
   "components": {
     "schemas": {
       "Vehicle": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "sku": { "type": "string" },
-          "make": { "type": "string" },
-          "brand": { "type": "string", "description": "Forest River brand (e.g. Rockwood, Cherokee, Tidewater)" },
-          "model": { "type": "string" },
-          "year": { "type": "integer" },
-          "type": { "type": "string" },
-          "category": { "type": "string", "enum": ["Camping", "Work & Play", "Marine", "Specialty"] },
-          "msrp": { "type": "number" },
-          "length": { "type": "string" },
-          "sleeps": { "type": "integer" },
-          "slides": { "type": "integer" },
-          "weight": { "type": "integer", "description": "GVWR in lbs" },
-          "dealerId": { "type": "string", "format": "uuid" },
-          "available": { "type": "boolean" },
-          "features": { "type": "array", "items": { "type": "string" } }
+          "id": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "make": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string",
+            "description": "Forest River brand (e.g. Rockwood, Cherokee, Tidewater)"
+          },
+          "model": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "Camping",
+              "Work & Play",
+              "Marine",
+              "Specialty"
+            ]
+          },
+          "msrp": {
+            "type": "number"
+          },
+          "length": {
+            "type": "string"
+          },
+          "sleeps": {
+            "type": "integer"
+          },
+          "slides": {
+            "type": "integer"
+          },
+          "weight": {
+            "type": "integer",
+            "description": "GVWR in lbs"
+          },
+          "dealerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -706,7 +1115,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "Authorization",
-        "description": "Bearer token — your Forest River API key"
+        "description": "Bearer token \u2014 your Forest River API key"
       }
     }
   }
