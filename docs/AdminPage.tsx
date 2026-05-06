@@ -220,14 +220,14 @@ export function AdminPage() {
 
   // Announcement state
   const [announcementMessage, setAnnouncementMessage] = useState("");
-  const [announcementTarget, setAnnouncementTarget] = useState<"all" | "basic" | "pro" | "enterprise">("all");
+  const [announcementTarget, setAnnouncementTarget] = useState<"all" | "catalog" | "commerce" | "pro" | "enterprise">("all");
   const [announcementType, setAnnouncementType] = useState<"info" | "warning" | "success">("info");
   const [publishing, setPublishing] = useState(false);
 
   // Email state
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
-  const [emailTarget, setEmailTarget] = useState<"all" | "basic" | "pro" | "enterprise">("all");
+  const [emailTarget, setEmailTarget] = useState<"all" | "catalog" | "commerce" | "pro" | "enterprise">("all");
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
@@ -775,7 +775,8 @@ export function AdminPage() {
                 <div className="flex gap-2 flex-wrap">
                   {([
                     { id: "all", label: "All Consumers" },
-                    { id: "basic", label: "Basic" },
+                    { id: "catalog", label: "Catalog" },
+                    { id: "commerce", label: "Commerce" },
                     { id: "pro", label: "Pro" },
                     { id: "enterprise", label: "Enterprise" },
                   ] as const).map(t => (
@@ -872,7 +873,8 @@ export function AdminPage() {
                 <div className="flex gap-2 flex-wrap">
                   {([
                     { id: "all", label: "All Consumers" },
-                    { id: "basic", label: "Basic" },
+                    { id: "catalog", label: "Catalog" },
+                    { id: "commerce", label: "Commerce" },
                     { id: "pro", label: "Pro" },
                     { id: "enterprise", label: "Enterprise" },
                   ] as const).map(t => (

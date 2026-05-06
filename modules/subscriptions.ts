@@ -657,7 +657,7 @@ export async function adminMoveSubscription(request: ZuploRequest, context: Zupl
 /** POST /admin/announcements */
 export async function adminPublishAnnouncement(request: ZuploRequest, context: ZuploContext) {
   if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-  const body = await request.json() as { message: string; target: "all" | "basic" | "pro" | "enterprise"; type: "info" | "warning" | "success" };
+  const body = await request.json() as { message: string; target: "all" | "catalog" | "commerce" | "pro" | "enterprise"; type: "info" | "warning" | "success" };
   const consumers = await listConsumers();
   const targets = consumers.filter(c => {
     if (c.tags?.["status"] !== "active") return false;
