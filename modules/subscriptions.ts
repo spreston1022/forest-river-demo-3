@@ -20,6 +20,14 @@ const STRIPE_PRICE_IDS: Record<string, string> = {
 const METERING_BUCKET_ID = "bckt_2vednH8xqLal1GgMI5pLSoQQdHhxV5Fjt";
 const ZUDOKU_METERING_DEPLOYMENT = "forest-river-demo-main-fb06bf1";
 
+// Native monetization plan IDs (from Zuplo dashboard — different from metering API plan IDs)
+const METERING_PLAN_IDS: Record<string, string> = {
+  catalog:    "01KQX0MV12JHJ042MT2W28N9Z2",
+  commerce:   "01KQX0YFRGYYX6DT7MZ0W79P75",
+  pro:        "01KQX0RCAZ3EDEGBFKE7GN80XW",
+  enterprise: "01KQX0TVK98FHEWYYAWSTTQM83",
+};
+
 // ─── Email via Resend ─────────────────────────────────────────────────────────
 
 async function sendEmail(to: string, subject: string, html: string, context: ZuploContext): Promise<void> {
@@ -772,28 +780,12 @@ export async function activateSubscription(request: ZuploRequest, context: Zuplo
   const planId = existing.tags?.["plan"] ?? "";
   const userJwt = request.headers.get("Authorization") ?? "";
 
-  // Fetch available plans from zudoku-metering to find the correct plan ID
-  const plansRes = await fetch(
-    `https://api.zuploedge.com/v3/zudoku-metering/${ZUDOKU_METERING_DEPLOYMENT}/plans`,
-    { headers: { Authorization: userJwt } },
-  );
-  if (!plansRes.ok) {
-    const plansErr = await plansRes.text();
-    context.log.error(`Failed to fetch zudoku-metering plans (${plansRes.status}): ${plansErr}`);
-    return new Response(JSON.stringify({ error: `Could not load plans (${plansRes.status}): ${plansErr}` }), { status: 502 });
+  const planUlid = METERING_PLAN_IDS[planId];
+  if (!planUlid) {
+    context.log.error(`No native monetization plan ID configured for key "${planId}"`);
+    return new Response(JSON.stringify({ error: `Unknown plan "${planId}"` }), { status: 400 });
   }
-  const plansData = await plansRes.json() as any;
-  context.log.info(`zudoku-metering plans response: ${JSON.stringify(plansData)}`);
-  const availablePlans: any[] = plansData.items ?? plansData ?? [];
-  const matchedPlan = availablePlans.find(
-    (p: any) => p.key === planId || p.slug === planId || p.id === planId,
-  );
-  if (!matchedPlan) {
-    context.log.error(`No zudoku-metering plan matched key "${planId}". Available: ${JSON.stringify(availablePlans.map((p: any) => ({ id: p.id, key: p.key, slug: p.slug, name: p.name })))}`);
-    return new Response(JSON.stringify({ error: `No monetization plan configured for "${planId}". Available plan keys: ${availablePlans.map((p: any) => p.key ?? p.slug ?? p.id).join(", ")}` }), { status: 400 });
-  }
-  const planUlid = matchedPlan.id as string;
-  context.log.info(`Resolved plan key "${planId}" to zudoku-metering plan ID: ${planUlid}`);
+  context.log.info(`Activating plan "${planId}" with zudoku-metering plan ID: ${planUlid}`);
 
   // Call zudoku-metering with the user's JWT — this creates the internal consumer+key+subscription link
   const meteringRes = await fetch(
