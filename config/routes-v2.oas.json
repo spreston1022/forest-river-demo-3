@@ -1177,68 +1177,6 @@
           }
         }
       }
-    },
-    "/path-1": {
-      "get": {
-        "summary": "Echo a GET request",
-        "description": "Returns the full details of the incoming GET request as JSON — headers, query parameters, URL, and method.",
-        "operationId": "echo-get",
-        "parameters": [
-          {
-            "name": "any",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Any query parameters are echoed back in the response"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Echo response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EchoResponse"
-                },
-                "example": {
-                  "method": "GET",
-                  "url": "https://echo.zuplo.io/path-1?foo=bar",
-                  "headers": {
-                    "authorization": "Bearer zpka_abc123",
-                    "user-agent": "curl/7.88.1",
-                    "accept": "*/*"
-                  },
-                  "query": {
-                    "foo": "bar"
-                  },
-                  "body": null
-                }
-              }
-            }
-          }
-        },
-        "x-zuplo-route": {
-          "corsPolicy": "none",
-          "handler": {
-            "export": "urlForwardHandler",
-            "module": "$import(@zuplo/runtime)",
-            "options": {
-              "baseUrl": "https://echo.zuplo.io"
-            }
-          },
-          "policies": {
-            "inbound": [
-              "kill-switch-vehicles",
-              "api-key-inbound",
-              "revocation-check-inbound",
-              "plan-access-catalog",
-              "plan-rate-limit-inbound",
-              "plan-quota-inbound"
-            ]
-          }
-        }
-      }
     }
   }
 }
