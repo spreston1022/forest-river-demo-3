@@ -188,25 +188,48 @@ async function verifyStripeWebhook(payload: string, sig: string, secret: string)
 
 // ─── Zuplo metering API ───────────────────────────────────────────────────────
 
+const METERING_BASE = `https://dev.zuplo.com/v3/metering/${METERING_BUCKET_ID}`;
+
+async function meteringFetch(path: string, body: unknown): Promise<any> {
+  const res = await fetch(`${METERING_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${environment.API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Metering ${path} failed: ${await res.text()}`);
+  return res.json();
+}
+
 async function createZuploMeteringSubscription(
+  consumerName: string,
   userId: string,
+  email: string,
+  companyName: string,
   planKey: string,
   stripeCustomerId: string,
   context: ZuploContext,
 ): Promise<void> {
-  const res = await fetch(
-    `https://dev.zuplo.com/v3/metering/${METERING_BUCKET_ID}/subscriptions`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${environment.API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ customerId: userId, planKey, stripeCustomerId }),
-    },
-  );
-  if (!res.ok) throw new Error(`Zuplo metering subscription failed: ${await res.text()}`);
-  context.log.info(`Zuplo metering subscription created: ${userId} on plan ${planKey}`);
+  // Step 1: create (or retrieve) a metering customer whose usageAttribution
+  // points to the consumer name — this is how the monetization-inbound policy
+  // links an incoming API key to a subscription.
+  const customer = await meteringFetch("/customers", {
+    name: companyName || email || consumerName,
+    primaryEmail: email || undefined,
+    key: userId,
+    usageAttribution: { subjectKeys: [consumerName] },
+  });
+  context.log.info(`Metering customer created: ${customer.id} for ${consumerName}`);
+
+  // Step 2: create the subscription using the internal ULID from step 1.
+  await meteringFetch("/subscriptions", {
+    customerId: customer.id,
+    planKey,
+    stripeCustomerId,
+  });
+  context.log.info(`Metering subscription created: ${consumerName} on plan ${planKey}`);
 }
 
 // ─── Zuplo management API ─────────────────────────────────────────────────────
@@ -438,7 +461,7 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
   }
   const stripeSubscriptionId = await createStripeSubscription(stripeCustomerId, priceId);
   const userId = existing.metadata?.["userId"] ?? "";
-  await createZuploMeteringSubscription(userId, planId, stripeCustomerId, context);
+  await createZuploMeteringSubscription(consumerName, userId, email, company, planId, stripeCustomerId, context);
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Approved subscription key" }) as { key: string };
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, status: "active" },
@@ -518,7 +541,9 @@ export async function handleStripeWebhook(request: ZuploRequest, context: ZuploC
           const stripeCustomerId = existing.metadata?.["stripeCustomerId"] ?? (session["customer"] as string) ?? "";
           const userId = existing.metadata?.["userId"] ?? "";
           const planId = existing.tags?.["plan"] ?? "";
-          await createZuploMeteringSubscription(userId, planId, stripeCustomerId, context);
+          const webhookEmail = existing.metadata?.["email"] ?? "";
+          const webhookCompany = existing.metadata?.["companyName"] || webhookEmail || "Dealer";
+          await createZuploMeteringSubscription(consumerName, userId, webhookEmail, webhookCompany, planId, stripeCustomerId, context);
           const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Subscription key" }) as { key: string };
           await zuploPatch(`/consumers/${consumerName}`, {
             tags: { ...existing.tags, status: "active" },
