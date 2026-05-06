@@ -772,15 +772,28 @@ export async function activateSubscription(request: ZuploRequest, context: Zuplo
   const planId = existing.tags?.["plan"] ?? "";
   const userJwt = request.headers.get("Authorization") ?? "";
 
-  // Look up the metering plan ULID by human-readable key
-  let planUlid: string;
-  try {
-    planUlid = await getPlanUlidByKey(planId);
-    context.log.info(`Resolved plan key "${planId}" to ULID: ${planUlid}`);
-  } catch (err) {
-    context.log.error(`Failed to look up metering plan ULID for key "${planId}": ${String(err)}`);
-    return new Response(JSON.stringify({ error: `Unknown plan "${planId}" — ${String(err)}` }), { status: 400 });
+  // Fetch available plans from zudoku-metering to find the correct plan ID
+  const plansRes = await fetch(
+    `https://api.zuploedge.com/v3/zudoku-metering/${ZUDOKU_METERING_DEPLOYMENT}/plans`,
+    { headers: { Authorization: userJwt } },
+  );
+  if (!plansRes.ok) {
+    const plansErr = await plansRes.text();
+    context.log.error(`Failed to fetch zudoku-metering plans (${plansRes.status}): ${plansErr}`);
+    return new Response(JSON.stringify({ error: `Could not load plans (${plansRes.status}): ${plansErr}` }), { status: 502 });
   }
+  const plansData = await plansRes.json() as any;
+  context.log.info(`zudoku-metering plans response: ${JSON.stringify(plansData)}`);
+  const availablePlans: any[] = plansData.items ?? plansData ?? [];
+  const matchedPlan = availablePlans.find(
+    (p: any) => p.key === planId || p.slug === planId || p.id === planId,
+  );
+  if (!matchedPlan) {
+    context.log.error(`No zudoku-metering plan matched key "${planId}". Available: ${JSON.stringify(availablePlans.map((p: any) => ({ id: p.id, key: p.key, slug: p.slug, name: p.name })))}`);
+    return new Response(JSON.stringify({ error: `No monetization plan configured for "${planId}". Available plan keys: ${availablePlans.map((p: any) => p.key ?? p.slug ?? p.id).join(", ")}` }), { status: 400 });
+  }
+  const planUlid = matchedPlan.id as string;
+  context.log.info(`Resolved plan key "${planId}" to zudoku-metering plan ID: ${planUlid}`);
 
   // Call zudoku-metering with the user's JWT — this creates the internal consumer+key+subscription link
   const meteringRes = await fetch(
