@@ -550,43 +550,6 @@
         }
       }
     },
-    "/me/quota": {
-      "x-zuplo-path": {
-        "pathMode": "open-api"
-      },
-      "get": {
-        "summary": "Get quota usage for authenticated consumer",
-        "operationId": "get-quota",
-        "x-internal": true,
-        "x-zuplo-route": {
-          "corsPolicy": "portal-cors",
-          "handler": {
-            "export": "quotaHandler",
-            "module": "$import(./modules/subscriptions)"
-          },
-          "policies": {
-            "inbound": [
-              "api-key-inbound",
-              "plan-quota-inbound"
-            ],
-            "outbound": [
-              "quota-outbound"
-            ]
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Quota usage"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "429": {
-            "description": "Quota exceeded"
-          }
-        }
-      }
-    },
     "/subscriptions/roll-key": {
       "x-zuplo-path": {
         "pathMode": "open-api"
@@ -767,6 +730,39 @@
           },
           "404": {
             "description": "Not found"
+          }
+        }
+      }
+    },
+    "/support/ticket": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Submit a support ticket",
+        "operationId": "submit-ticket",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "submitTicket",
+            "module": "$import(./modules/support)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ticket submitted"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }

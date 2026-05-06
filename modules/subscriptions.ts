@@ -416,20 +416,33 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     return new Response(JSON.stringify(consumerToSubscription(existing, apiKey)), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch { /* create new */ }
 
-  const consumer = await zuploPost(`/consumers`, {
+  const metadata = {
+    userId, email: userEmail, plan: body.planId, planName: body.planName,
+    companyName: body.companyName ?? "", dealerId: body.dealerId ?? "",
+    useCase: body.useCase ?? "", expectedVolume: body.expectedVolume ?? "",
+    webhookUrl: body.webhookUrl ?? "",
+    tosAccepted: body.tosAccepted ? "true" : "false", tosAcceptedAt: body.tosAcceptedAt ?? "",
+    requestedAt: new Date().toISOString(),
+  };
+
+  const FREE_PLANS = ["catalog", "commerce"];
+  const isFreePlan = FREE_PLANS.includes(body.planId);
+
+  await zuploPost(`/consumers`, {
     name: consumerName,
     description: (body.companyName || userEmail) + " — " + body.planName + " plan",
-    tags: { plan: body.planId, status: "pending" },
-    metadata: {
-      userId, email: userEmail, plan: body.planId, planName: body.planName,
-      companyName: body.companyName ?? "", dealerId: body.dealerId ?? "",
-      useCase: body.useCase ?? "", expectedVolume: body.expectedVolume ?? "",
-      webhookUrl: body.webhookUrl ?? "",
-      tosAccepted: body.tosAccepted ? "true" : "false", tosAcceptedAt: body.tosAcceptedAt ?? "",
-      requestedAt: new Date().toISOString(),
-    },
-  }) as ZuploConsumer;
+    tags: { plan: body.planId, status: isFreePlan ? "active" : "pending" },
+    metadata: { ...metadata, ...(isFreePlan ? { resolvedAt: new Date().toISOString() } : {}) },
+  });
 
+  if (isFreePlan) {
+    const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Auto-approved subscription key" }) as { key: string };
+    const consumer = await getConsumerWithKey(consumerName);
+    if (userEmail) context.waitUntil(sendEmail(userEmail, `Your ${body.planName} API Access is Ready`, approvalHtml(body.companyName || userEmail, body.planName, keyData.key), context));
+    return new Response(JSON.stringify(consumerToSubscription(consumer, keyData.key)), { status: 201, headers: { "Content-Type": "application/json" } });
+  }
+
+  const consumer = await getConsumerWithKey(consumerName);
   return new Response(JSON.stringify(consumerToSubscription(consumer)), { status: 201, headers: { "Content-Type": "application/json" } });
 }
 
@@ -742,12 +755,6 @@ export async function adminOffboardSubscription(request: ZuploRequest, context: 
   const plan = existing.metadata?.["planName"] ?? "API";
   if (email) context.waitUntil(sendEmail(email, "Your Forest River API Access Has Been Terminated", offboardHtml(company, plan), context));
   return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
-}
-
-/** POST /subscriptions/roll-key  body: { subscriptionId: string } — consumer self-service */
-/** GET /me/quota — returns quota usage via outbound policy body injection */
-export async function quotaHandler(request: ZuploRequest, context: ZuploContext) {
-  return new Response(JSON.stringify({}), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
 export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {

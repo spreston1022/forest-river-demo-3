@@ -680,7 +680,7 @@ export function AdminPage() {
                 </div>
 
                 {plan.members.length === 0 ? (
-                  <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground text-sm">
+                  <div className="rounded-xl border border-border bg-muted/40 p-6 text-center text-muted-foreground text-sm">
                     No active consumers in this group
                   </div>
                 ) : (
