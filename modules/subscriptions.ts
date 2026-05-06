@@ -767,6 +767,7 @@ export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {
   if (existing.tags?.["status"] !== "active") return new Response(JSON.stringify({ error: "Subscription not active" }), { status: 400 });
 
   const oldKeyId = existing.apiKeys?.[0]?.id ?? "";
+  const oldKeyValue = existing.apiKeys?.[0]?.key ?? "";
   const gracePeriodHours = 1;
   const oldKeyExpiry = new Date(Date.now() + gracePeriodHours * 60 * 60 * 1000).toISOString();
 
@@ -781,7 +782,7 @@ export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {
   const plan = existing.metadata?.["planName"] ?? "API";
   if (email) context.waitUntil(sendEmail(email, "Your Forest River API Key Has Been Rolled", keyRollHtml(company, plan, keyData.key, oldKeyExpiry), context));
 
-  return new Response(JSON.stringify({ apiKey: keyData.key, oldKeyExpiry }), { status: 200, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ apiKey: keyData.key, oldKey: oldKeyValue, oldKeyExpiry }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
 /** POST /admin/email */

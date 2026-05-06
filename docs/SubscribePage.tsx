@@ -27,6 +27,7 @@ interface Subscription {
   planName: string;
   status: "pending" | "active" | "rejected" | "suspended" | "approved_pending_payment";
   apiKey?: string;
+  oldKey?: string;
   oldKeyExpiry?: string;
   requestedAt: string;
   resolvedAt?: string;
@@ -495,7 +496,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, apiKey: data.apiKey, oldKeyExpiry: data.oldKeyExpiry } : s));
+      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, apiKey: data.apiKey, oldKey: data.oldKey, oldKeyExpiry: data.oldKeyExpiry } : s));
       showToast("🔑 Key rolled! Your new key is shown below. Old key valid for 1 hour.", "success");
     } catch (err: any) {
       showToast(`Failed to roll key: ${err.message}`, "error");
@@ -688,9 +689,13 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                               </div>
 
                             </div>
-                            {sub.oldKeyExpiry && new Date(sub.oldKeyExpiry) > new Date() && (
-                              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                                ⚠️ <strong>Previous key expires</strong> {new Date(sub.oldKeyExpiry).toLocaleString()} — update your integration before then.
+                            {sub.oldKey && sub.oldKeyExpiry && new Date(sub.oldKeyExpiry) > new Date() && (
+                              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 p-3 text-xs text-amber-800 dark:text-amber-300">
+                                <p className="mb-1.5 font-medium">⚠️ Previous key — expires {new Date(sub.oldKeyExpiry).toLocaleString()}</p>
+                                <div className="flex items-center">
+                                  <MaskedKey value={sub.oldKey} />
+                                  <CopyButton text={sub.oldKey} />
+                                </div>
                               </div>
                             )}
                             <QuotaBar apiKey={sub.apiKey} planId={sub.planId} />
