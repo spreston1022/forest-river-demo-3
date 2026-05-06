@@ -780,12 +780,8 @@ export async function activateSubscription(request: ZuploRequest, context: Zuplo
   const planId = existing.tags?.["plan"] ?? "";
   const userJwt = request.headers.get("Authorization") ?? "";
 
-  const planUlid = METERING_PLAN_IDS[planId];
-  if (!planUlid) {
-    context.log.error(`No native monetization plan ID configured for key "${planId}"`);
-    return new Response(JSON.stringify({ error: `Unknown plan "${planId}"` }), { status: 400 });
-  }
-  context.log.info(`Activating plan "${planId}" with zudoku-metering plan ID: ${planUlid}`);
+  const planUlid = planId; // pass key directly — zudoku-metering may use key, not ULID
+  context.log.info(`Activating plan "${planId}" with zudoku-metering planId: ${planUlid}`);
 
   // Call zudoku-metering with the user's JWT — this creates the internal consumer+key+subscription link
   const meteringRes = await fetch(
