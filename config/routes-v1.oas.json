@@ -35,7 +35,7 @@
               "plan-access-catalog",
               "plan-rate-limit-inbound",
               "v1-mock-inbound"
-            ],
+            ]
           }
         },
         "responses": {
@@ -133,7 +133,7 @@
               "plan-access-catalog",
               "plan-rate-limit-inbound",
               "v1-mock-inbound"
-            ],
+            ]
           }
         },
         "responses": {
@@ -217,7 +217,7 @@
               "plan-access-commerce",
               "plan-rate-limit-inbound",
               "v1-mock-inbound"
-            ],
+            ]
           }
         },
         "responses": {
