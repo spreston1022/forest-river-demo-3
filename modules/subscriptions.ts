@@ -559,12 +559,6 @@ export async function handleStripeWebhook(request: ZuploRequest, context: ZuploC
         const existing = await getConsumerWithKey(consumerName);
         if (existing.tags?.["status"] === "approved_pending_payment") {
           const stripeSubscriptionId = (session["subscription"] as string) ?? "";
-          const stripeCustomerId = existing.metadata?.["stripeCustomerId"] ?? (session["customer"] as string) ?? "";
-          const userId = existing.metadata?.["userId"] ?? "";
-          const planId = existing.tags?.["plan"] ?? "";
-          const webhookEmail = existing.metadata?.["email"] ?? "";
-          const webhookCompany = existing.metadata?.["companyName"] || webhookEmail || "Dealer";
-          await createZuploMeteringSubscription(consumerName, userId, webhookEmail, webhookCompany, planId, stripeCustomerId, stripeSubscriptionId, context);
           const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Subscription key" }) as { key: string };
           await zuploPatch(`/consumers/${consumerName}`, {
             tags: { ...existing.tags, status: "active" },
