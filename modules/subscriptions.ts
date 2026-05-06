@@ -218,16 +218,17 @@ async function meteringPut(path: string, body: unknown): Promise<any> {
 
 async function getOrCreateMeteringCustomer(
   consumerName: string,
-  userId: string,
   email: string,
   companyName: string,
   context: ZuploContext,
 ): Promise<string> {
+  // Use consumerName as the customer key — one metering customer per Zuplo consumer.
+  // subjectKeys maxItems is 1, so we cannot share one customer across multiple consumers.
   try {
     const customer = await meteringPost("/customers", {
       name: companyName || email || consumerName,
       primaryEmail: email || undefined,
-      key: userId,
+      key: consumerName,
       usageAttribution: { subjectKeys: [consumerName] },
     });
     context.log.info(`Metering customer created: ${customer.id}, subjectKeys: ${JSON.stringify(customer.usageAttribution?.subjectKeys)}`);
@@ -235,26 +236,12 @@ async function getOrCreateMeteringCustomer(
   } catch (err) {
     const msg = String(err);
     if (!msg.includes("409") && !msg.includes("Conflict")) throw err;
-    // Customer already exists — fetch it by key
-    const list = await meteringGet(`/customers?key=${encodeURIComponent(userId)}`);
+    // Customer already exists for this consumer — fetch it by key
+    const list = await meteringGet(`/customers?key=${encodeURIComponent(consumerName)}`);
     const items: any[] = list.items ?? list;
-    const existing = items.find((c: any) => c.key === userId);
-    if (!existing) throw new Error(`Metering customer with key ${userId} not found after 409`);
-    context.log.info(`Metering customer already exists: ${existing.id}, current subjectKeys: ${JSON.stringify(existing.usageAttribution?.subjectKeys)}`);
-
-    // Ensure the current consumer name is in subjectKeys — the existing customer may
-    // have been created in a prior attempt with stale or missing subjectKeys.
-    const existingKeys: string[] = existing.usageAttribution?.subjectKeys ?? [];
-    if (!existingKeys.includes(consumerName)) {
-      const updated = await meteringPut(`/customers/${existing.id}`, {
-        name: existing.name || companyName || email || consumerName,
-        primaryEmail: existing.primaryEmail || email || undefined,
-        key: userId,
-        usageAttribution: { subjectKeys: [...existingKeys, consumerName] },
-      });
-      context.log.info(`Updated metering customer subjectKeys: ${JSON.stringify(updated.usageAttribution?.subjectKeys)}`);
-    }
-
+    const existing = items.find((c: any) => c.key === consumerName);
+    if (!existing) throw new Error(`Metering customer with key ${consumerName} not found after 409`);
+    context.log.info(`Metering customer already exists: ${existing.id}, subjectKeys: ${JSON.stringify(existing.usageAttribution?.subjectKeys)}`);
     return existing.id as string;
   }
 }
@@ -269,11 +256,11 @@ async function createZuploMeteringSubscription(
   stripeSubscriptionId: string,
   context: ZuploContext,
 ): Promise<void> {
-  const customerId = await getOrCreateMeteringCustomer(consumerName, userId, email, companyName, context);
-  // "Create from plan" variant: customerKey resolves to the metering customer by external key.
+  const customerId = await getOrCreateMeteringCustomer(consumerName, email, companyName, context);
+  // customerKey matches the metering customer's key field (= consumerName).
   // Pass Stripe IDs so Zuplo can verify payment status and mark the subscription active.
   const subscription = await meteringPost("/subscriptions", {
-    customerKey: userId,
+    customerKey: consumerName,
     plan: { key: planKey },
     ...(stripeCustomerId ? { stripeCustomerId } : {}),
     ...(stripeSubscriptionId ? { stripeSubscriptionId } : {}),
