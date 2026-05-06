@@ -12,7 +12,6 @@ const KILL_SWITCH_ROUTES = [
   { key: "orders",    label: "Orders API",    routes: "GET/POST /v2/orders · GET /v1/orders" },
   { key: "pricing",   label: "Pricing API",   routes: "GET /v2/pricing" },
   { key: "dealers",   label: "Dealers API",   routes: "GET /v2/dealers" },
-  { key: "mcp",       label: "MCP Server",    routes: "POST /mcp" },
 ] as const;
 
 interface Subscription {

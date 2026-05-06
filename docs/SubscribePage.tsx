@@ -70,8 +70,12 @@ function QuotaBar({ apiKey, planId }: { apiKey: string; planId: string }) {
     const endpoint = PLAN_PROBE[planId] ?? "/v2/vehicles";
     fetch(`${GATEWAY_URL}${endpoint}`, { headers: { Authorization: `Bearer ${apiKey}` } })
       .then((res) => {
+        const allHeaders: Record<string, string> = {};
+        res.headers.forEach((value, key) => { allHeaders[key] = value; });
+        console.log("[QuotaBar] probe response headers:", allHeaders);
         const remaining = parseInt(res.headers.get("RateLimit-Remaining") ?? res.headers.get("X-RateLimit-Remaining") ?? "");
         const limit = parseInt(res.headers.get("RateLimit-Limit") ?? res.headers.get("X-RateLimit-Limit") ?? "");
+        console.log("[QuotaBar] remaining:", remaining, "limit:", limit);
         if (!isNaN(remaining) && !isNaN(limit) && limit > 0) {
           setQuota({ remaining, limit });
           setStatus("ready");
@@ -79,7 +83,7 @@ function QuotaBar({ apiKey, planId }: { apiKey: string; planId: string }) {
           setStatus("unavailable");
         }
       })
-      .catch(() => setStatus("unavailable"));
+      .catch((err) => { console.log("[QuotaBar] probe failed:", err); setStatus("unavailable"); });
   }, [apiKey, planId]);
 
   if (status === "loading") return <div className="mt-3 text-xs text-muted-foreground animate-pulse">Loading quota…</div>;
@@ -518,7 +522,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
             <div key={tier}>
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {tier === "free" ? "Free Tier — Auto-approved" : "Paid Plans — Admin review"}
+                  {tier === "free" ? "Free Tier" : "Paid Plans — Admin review"}
                 </p>
                 <div className="flex-1 h-px bg-border" />
               </div>
