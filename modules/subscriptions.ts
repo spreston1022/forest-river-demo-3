@@ -776,9 +776,10 @@ export async function activateSubscription(request: ZuploRequest, context: Zuplo
   let planUlid: string;
   try {
     planUlid = await getPlanUlidByKey(planId);
+    context.log.info(`Resolved plan key "${planId}" to ULID: ${planUlid}`);
   } catch (err) {
     context.log.error(`Failed to look up metering plan ULID for key "${planId}": ${String(err)}`);
-    return new Response(JSON.stringify({ error: "Unknown plan" }), { status: 400 });
+    return new Response(JSON.stringify({ error: `Unknown plan "${planId}" — ${String(err)}` }), { status: 400 });
   }
 
   // Call zudoku-metering with the user's JWT — this creates the internal consumer+key+subscription link
@@ -794,7 +795,7 @@ export async function activateSubscription(request: ZuploRequest, context: Zuplo
   if (!meteringRes.ok) {
     const errText = await meteringRes.text();
     context.log.error(`zudoku-metering activation failed (${meteringRes.status}): ${errText}`);
-    return new Response(JSON.stringify({ error: "Failed to activate subscription — please try again" }), { status: 502 });
+    return new Response(JSON.stringify({ error: `Activation failed (${meteringRes.status}): ${errText}` }), { status: 502 });
   }
 
   const meteringData = await meteringRes.json() as { consumer?: { name?: string; apiKeys?: { key: string }[] }; status?: string };
