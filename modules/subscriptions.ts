@@ -299,7 +299,10 @@ async function zuploPatch(path: string, body: unknown) {
 }
 
 async function zuploDelete(path: string) {
-  const res = await fetch(`${BASE}/${bucket()}${path}`, { method: "DELETE", headers: zuploHeaders() });
+  const res = await fetch(`${BASE}/${bucket()}${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${environment.API_KEY}` },
+  });
   if (!res.ok && res.status !== 404) throw new Error(`Zuplo DELETE ${path} failed: ${await res.text()}`);
 }
 
