@@ -29,6 +29,7 @@ interface Subscription {
   apiKey?: string;
   oldKey?: string;
   oldKeyExpiry?: string;
+  requestCount?: number;
   requestedAt: string;
   resolvedAt?: string;
   companyName?: string;
@@ -668,7 +669,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                                 </div>
                               </div>
                             )}
-                            <QuotaBar planId={sub.planId} />
+                            <QuotaBar planId={sub.planId} used={sub.requestCount ?? 0} />
                           </div>
                         )}
                         {sub.status === "suspended" && (

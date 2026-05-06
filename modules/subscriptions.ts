@@ -377,6 +377,7 @@ function consumerToSubscription(c: ZuploConsumer, apiKey?: string) {
     apiKey,
     oldKeyExpiry: c.tags?.["oldKeyExpiry"] ?? "",
     oldKey: (c.tags?.["oldKeyExpiry"] && new Date(c.tags["oldKeyExpiry"]) > new Date()) ? (c.metadata?.["oldKeyValue"] ?? "") : "",
+    requestCount: parseInt(c.metadata?.["requestCount"] ?? "0"),
     requestedAt: c.metadata?.["requestedAt"] ?? new Date().toISOString(),
     resolvedAt: c.metadata?.["resolvedAt"],
     portalMessage: c.metadata?.["portalMessage"] ?? "",
