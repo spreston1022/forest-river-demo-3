@@ -11,22 +11,31 @@ function currentMonth() {
   return new Date().toISOString().slice(0, 7); // "2026-05"
 }
 
-async function incrementUsage(consumerName: string) {
+async function incrementUsage(consumerName: string, context: ZuploContext) {
   try {
-    const res = await fetch(`${BASE}/${environment.BUCKET_NAME}/consumers/${consumerName}`, {
-      headers: zuploHeaders(),
-    });
-    if (!res.ok) return;
+    const url = `${BASE}/${environment.BUCKET_NAME}/consumers/${consumerName}`;
+    context.log.info(`[usage] fetching consumer: ${url}`);
+    const res = await fetch(url, { headers: zuploHeaders() });
+    context.log.info(`[usage] GET consumer status: ${res.status}`);
+    if (!res.ok) {
+      context.log.warn(`[usage] GET failed: ${await res.text()}`);
+      return;
+    }
     const data = await res.json() as { metadata?: Record<string, string> };
     const meta = data.metadata ?? {};
     const month = currentMonth();
     const count = meta["requestCountMonth"] === month ? parseInt(meta["requestCount"] ?? "0") + 1 : 1;
-    await fetch(`${BASE}/${environment.BUCKET_NAME}/consumers/${consumerName}`, {
+    context.log.info(`[usage] incrementing to ${count} for month ${month}`);
+    const patchRes = await fetch(url, {
       method: "PATCH",
       headers: zuploHeaders(),
       body: JSON.stringify({ metadata: { ...meta, requestCount: String(count), requestCountMonth: month } }),
     });
-  } catch { /* non-critical */ }
+    context.log.info(`[usage] PATCH status: ${patchRes.status}`);
+    if (!patchRes.ok) context.log.warn(`[usage] PATCH failed: ${await patchRes.text()}`);
+  } catch (err) {
+    context.log.error(`[usage] error: ${err}`);
+  }
 }
 
 export default async function (response: Response, request: ZuploRequest, context: ZuploContext) {
@@ -37,7 +46,10 @@ export default async function (response: Response, request: ZuploRequest, contex
   );
 
   if (request.user?.sub) {
-    context.waitUntil(incrementUsage(request.user.sub));
+    context.log.info(`[usage] scheduling increment for consumer: ${request.user.sub}`);
+    context.waitUntil(incrementUsage(request.user.sub, context));
+  } else {
+    context.log.warn(`[usage] no user sub on request`);
   }
 
   return new Response(response.body, { status: response.status, headers });
