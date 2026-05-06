@@ -456,7 +456,9 @@ export async function getMySubscriptions(request: ZuploRequest, context: ZuploCo
   const subscriptions = await Promise.all(mine.map(async (c) => {
     try {
       const withKey = await getConsumerWithKey(c.name);
-      const apiKey = withKey.tags?.["status"] === "active" ? withKey.apiKeys?.[0]?.key : undefined;
+      const oldKeyId = withKey.tags?.["oldKeyId"] ?? "";
+      const activeKeyEntry = withKey.apiKeys?.find(k => k.id !== oldKeyId) ?? withKey.apiKeys?.[0];
+      const apiKey = withKey.tags?.["status"] === "active" ? activeKeyEntry?.key : undefined;
       return consumerToSubscription(withKey, apiKey);
     } catch { return consumerToSubscription(c); }
   }));
