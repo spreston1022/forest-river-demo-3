@@ -198,14 +198,6 @@
       }
     },
     {
-      "name": "expose-quota-headers-outbound",
-      "policyType": "custom-code-outbound",
-      "handler": {
-        "export": "default",
-        "module": "$import(./modules/expose-quota-headers)"
-      }
-    },
-    {
       "name": "v1-deprecation-outbound",
       "policyType": "http-deprecation-outbound",
       "handler": {
