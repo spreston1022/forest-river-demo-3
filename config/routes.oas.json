@@ -402,31 +402,6 @@
         }
       }
     },
-    "/subscriptions/webhook": {
-      "x-zuplo-path": {
-        "pathMode": "open-api"
-      },
-      "post": {
-        "summary": "Stripe webhook \u2014 provision key after checkout",
-        "operationId": "stripe-webhook",
-        "x-internal": true,
-        "x-zuplo-route": {
-          "corsPolicy": "none",
-          "handler": {
-            "export": "handleStripeWebhook",
-            "module": "$import(./modules/subscriptions)"
-          },
-          "policies": {
-            "inbound": []
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Webhook processed"
-          }
-        }
-      }
-    },
     "/subscriptions/checkout": {
       "x-zuplo-path": {
         "pathMode": "open-api"
@@ -513,6 +488,31 @@
           },
           "401": {
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/webhooks/stripe": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Stripe webhook \u2014 provision key after checkout",
+        "operationId": "stripe-webhook",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "none",
+          "handler": {
+            "export": "handleStripeWebhook",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": []
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed"
           }
         }
       }
