@@ -339,6 +339,69 @@
         }
       }
     },
+    "/admin/maintenance": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "get": {
+        "summary": "Admin — get maintenance mode state",
+        "operationId": "admin-get-maintenance",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminGetMaintenance",
+            "module": "$import(./modules/maintenance)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Maintenance state"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin — enable or disable maintenance mode",
+        "operationId": "admin-set-maintenance",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "adminSetMaintenance",
+            "module": "$import(./modules/maintenance)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound",
+              "admin-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Maintenance state updated"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/subscriptions/webhook": {
       "x-zuplo-path": {
         "pathMode": "open-api"
