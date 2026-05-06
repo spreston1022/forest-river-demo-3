@@ -426,22 +426,12 @@ export async function createSubscription(request: ZuploRequest, context: ZuploCo
     requestedAt: new Date().toISOString(),
   };
 
-  const FREE_PLANS = ["catalog", "commerce"];
-  const isFreePlan = FREE_PLANS.includes(body.planId);
-
   await zuploPost(`/consumers`, {
     name: consumerName,
     description: (body.companyName || userEmail) + " — " + body.planName + " plan",
-    tags: { plan: body.planId, status: isFreePlan ? "active" : "pending" },
-    metadata: { ...metadata, ...(isFreePlan ? { resolvedAt: new Date().toISOString() } : {}) },
+    tags: { plan: body.planId, status: "pending" },
+    metadata,
   });
-
-  if (isFreePlan) {
-    const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Auto-approved subscription key" }) as { key: string };
-    const consumer = await getConsumerWithKey(consumerName);
-    if (userEmail) context.waitUntil(sendEmail(userEmail, `Your ${body.planName} API Access is Ready`, approvalHtml(body.companyName || userEmail, body.planName, keyData.key), context));
-    return new Response(JSON.stringify(consumerToSubscription(consumer, keyData.key)), { status: 201, headers: { "Content-Type": "application/json" } });
-  }
 
   const consumer = await getConsumerWithKey(consumerName);
   return new Response(JSON.stringify(consumerToSubscription(consumer)), { status: 201, headers: { "Content-Type": "application/json" } });
