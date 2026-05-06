@@ -186,6 +186,14 @@
       }
     },
     {
+      "name": "v1-mock-inbound",
+      "policyType": "custom-code-inbound",
+      "handler": {
+        "export": "default",
+        "module": "$import(./modules/v1-mock)"
+      }
+    },
+    {
       "name": "mock-api-inbound",
       "policyType": "mock-api-inbound",
       "handler": {

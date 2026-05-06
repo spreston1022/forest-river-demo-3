@@ -29,16 +29,12 @@
           "policies": {
             "inbound": [
               "v1-sunset-inbound",
-              "v1-brownout-inbound",
               "kill-switch-vehicles",
               "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-catalog",
               "plan-rate-limit-inbound",
-              "mock-api-inbound"
-            ],
-            "outbound": [
-              "v1-deprecation-outbound"
+              "v1-mock-inbound"
             ]
           }
         },
@@ -131,16 +127,12 @@
           "policies": {
             "inbound": [
               "v1-sunset-inbound",
-              "v1-brownout-inbound",
               "kill-switch-inventory",
               "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-catalog",
               "plan-rate-limit-inbound",
-              "mock-api-inbound"
-            ],
-            "outbound": [
-              "v1-deprecation-outbound"
+              "v1-mock-inbound"
             ]
           }
         },
@@ -219,16 +211,12 @@
           "policies": {
             "inbound": [
               "v1-sunset-inbound",
-              "v1-brownout-inbound",
               "kill-switch-orders",
               "api-key-inbound",
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
-              "mock-api-inbound"
-            ],
-            "outbound": [
-              "v1-deprecation-outbound"
+              "v1-mock-inbound"
             ]
           }
         },
