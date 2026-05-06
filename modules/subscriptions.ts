@@ -208,6 +208,14 @@ async function meteringGet(path: string): Promise<any> {
   return res.json();
 }
 
+async function meteringPut(path: string, body: unknown): Promise<any> {
+  const res = await fetch(`${METERING_BASE}${path}`, {
+    method: "PUT", headers: meteringHeaders(), body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Metering PUT ${path} failed: ${await res.text()}`);
+  return res.json();
+}
+
 async function getOrCreateMeteringCustomer(
   consumerName: string,
   userId: string,
@@ -222,7 +230,7 @@ async function getOrCreateMeteringCustomer(
       key: userId,
       usageAttribution: { subjectKeys: [consumerName] },
     });
-    context.log.info(`Metering customer created: ${customer.id}`);
+    context.log.info(`Metering customer created: ${customer.id}, subjectKeys: ${JSON.stringify(customer.usageAttribution?.subjectKeys)}`);
     return customer.id as string;
   } catch (err) {
     const msg = String(err);
@@ -232,7 +240,21 @@ async function getOrCreateMeteringCustomer(
     const items: any[] = list.items ?? list;
     const existing = items.find((c: any) => c.key === userId);
     if (!existing) throw new Error(`Metering customer with key ${userId} not found after 409`);
-    context.log.info(`Metering customer already exists: ${existing.id}`);
+    context.log.info(`Metering customer already exists: ${existing.id}, current subjectKeys: ${JSON.stringify(existing.usageAttribution?.subjectKeys)}`);
+
+    // Ensure the current consumer name is in subjectKeys — the existing customer may
+    // have been created in a prior attempt with stale or missing subjectKeys.
+    const existingKeys: string[] = existing.usageAttribution?.subjectKeys ?? [];
+    if (!existingKeys.includes(consumerName)) {
+      const updated = await meteringPut(`/customers/${existing.id}`, {
+        name: existing.name || companyName || email || consumerName,
+        primaryEmail: existing.primaryEmail || email || undefined,
+        key: userId,
+        usageAttribution: { subjectKeys: [...existingKeys, consumerName] },
+      });
+      context.log.info(`Updated metering customer subjectKeys: ${JSON.stringify(updated.usageAttribution?.subjectKeys)}`);
+    }
+
     return existing.id as string;
   }
 }
@@ -244,13 +266,19 @@ async function createZuploMeteringSubscription(
   companyName: string,
   planKey: string,
   stripeCustomerId: string,
+  stripeSubscriptionId: string,
   context: ZuploContext,
 ): Promise<void> {
-  await getOrCreateMeteringCustomer(consumerName, userId, email, companyName, context);
-  // Use customerKey directly (Auth0 sub) — no ULID lookup needed.
-  // "plan" wraps the plan reference; "Create from plan" variant of the subscriptions endpoint.
-  await meteringPost("/subscriptions", { customerKey: userId, plan: { key: planKey } });
-  context.log.info(`Metering subscription created: ${consumerName} on plan ${planKey}`);
+  const customerId = await getOrCreateMeteringCustomer(consumerName, userId, email, companyName, context);
+  // "Create from plan" variant: customerKey resolves to the metering customer by external key.
+  // Pass Stripe IDs so Zuplo can verify payment status and mark the subscription active.
+  const subscription = await meteringPost("/subscriptions", {
+    customerKey: userId,
+    plan: { key: planKey },
+    ...(stripeCustomerId ? { stripeCustomerId } : {}),
+    ...(stripeSubscriptionId ? { stripeSubscriptionId } : {}),
+  });
+  context.log.info(`Metering subscription created: id=${subscription.id} status=${subscription.status} customer=${customerId} consumer=${consumerName} plan=${planKey}`);
 }
 
 // ─── Zuplo management API ─────────────────────────────────────────────────────
@@ -482,7 +510,7 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
   }
   const stripeSubscriptionId = await createStripeSubscription(stripeCustomerId, priceId);
   const userId = existing.metadata?.["userId"] ?? "";
-  await createZuploMeteringSubscription(consumerName, userId, email, company, planId, stripeCustomerId, context);
+  await createZuploMeteringSubscription(consumerName, userId, email, company, planId, stripeCustomerId, stripeSubscriptionId, context);
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Approved subscription key" }) as { key: string };
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, status: "active" },
@@ -564,7 +592,7 @@ export async function handleStripeWebhook(request: ZuploRequest, context: ZuploC
           const planId = existing.tags?.["plan"] ?? "";
           const webhookEmail = existing.metadata?.["email"] ?? "";
           const webhookCompany = existing.metadata?.["companyName"] || webhookEmail || "Dealer";
-          await createZuploMeteringSubscription(consumerName, userId, webhookEmail, webhookCompany, planId, stripeCustomerId, context);
+          await createZuploMeteringSubscription(consumerName, userId, webhookEmail, webhookCompany, planId, stripeCustomerId, stripeSubscriptionId, context);
           const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Subscription key" }) as { key: string };
           await zuploPatch(`/consumers/${consumerName}`, {
             tags: { ...existing.tags, status: "active" },
