@@ -36,12 +36,27 @@ export default async function(request: ZuploRequest, context: ZuploContext) {
   const user = request.user;
   if (!user) return request;
 
-  const tags = (user.data as any) ?? {};
-  const status = tags["status"];
-  const oldKeyId = tags["oldKeyId"] ?? "";
-  const oldKeyExpiry = tags["oldKeyExpiry"] ?? "";
   const consumerName = user.sub ?? "";
   const bucket = environment.BUCKET_NAME;
+
+  // Live fetch to bypass Zuplo's API key cache for suspension checks
+  let liveTags: Record<string, string> = {};
+  try {
+    const url = `${BASE}/${bucket}/consumers/${consumerName}`;
+    const res = await fetch(url, { headers: zuploHeaders() });
+    if (res.ok) {
+      const data = await res.json() as { tags?: Record<string, string>; metadata?: Record<string, string> };
+      liveTags = data.tags ?? {};
+    }
+  } catch (err) {
+    context.log.warn(`[revocation] live fetch failed: ${err}`);
+  }
+
+  context.log.info(`[revocation] liveTags: ${JSON.stringify(liveTags)}`);
+
+  const status = liveTags["status"];
+  const oldKeyId = liveTags["oldKeyId"] ?? "";
+  const oldKeyExpiry = liveTags["oldKeyExpiry"] ?? "";
 
   if (status === "suspended") {
     return new Response(
@@ -65,7 +80,7 @@ export default async function(request: ZuploRequest, context: ZuploContext) {
         await fetch(`${BASE}/${bucket}/consumers/${consumerName}`, {
           method: "PATCH",
           headers: zuploHeaders(),
-          body: JSON.stringify({ tags: { ...tags, oldKeyId: "", oldKeyExpiry: "" }, metadata: { oldKeyValue: "" } }),
+          body: JSON.stringify({ tags: { ...liveTags, oldKeyId: "", oldKeyExpiry: "" }, metadata: { oldKeyValue: "" } }),
         });
       } catch (err) {
         context.log.warn("Lazy cleanup failed for consumer " + consumerName + ": " + err);
