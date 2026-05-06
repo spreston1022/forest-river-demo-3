@@ -55,6 +55,53 @@ const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoti
 const VOLUME_OPTIONS = ["< 10,000 / month", "10,000 – 100,000 / month", "100,000 – 1,000,000 / month", "> 1,000,000 / month"];
 
 
+const PLAN_PROBE: Record<string, string> = {
+  catalog: "/v2/vehicles",
+  commerce: "/v2/pricing",
+  pro: "/v2/vehicles",
+  enterprise: "/v2/vehicles",
+};
+
+function QuotaBar({ apiKey, planId }: { apiKey: string; planId: string }) {
+  const [quota, setQuota] = useState<{ remaining: number; limit: number } | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+
+  useEffect(() => {
+    const endpoint = PLAN_PROBE[planId] ?? "/v2/vehicles";
+    fetch(`${GATEWAY_URL}${endpoint}`, { headers: { Authorization: `Bearer ${apiKey}` } })
+      .then((res) => {
+        const remaining = parseInt(res.headers.get("RateLimit-Remaining") ?? res.headers.get("X-RateLimit-Remaining") ?? "");
+        const limit = parseInt(res.headers.get("RateLimit-Limit") ?? res.headers.get("X-RateLimit-Limit") ?? "");
+        if (!isNaN(remaining) && !isNaN(limit) && limit > 0) {
+          setQuota({ remaining, limit });
+          setStatus("ready");
+        } else {
+          setStatus("unavailable");
+        }
+      })
+      .catch(() => setStatus("unavailable"));
+  }, [apiKey, planId]);
+
+  if (status === "loading") return <div className="mt-3 text-xs text-muted-foreground animate-pulse">Loading quota…</div>;
+  if (status === "unavailable" || !quota) return null;
+
+  const used = quota.limit - quota.remaining;
+  const pct = Math.min((used / quota.limit) * 100, 100);
+  const barColor = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-amber-500" : "bg-primary";
+
+  return (
+    <div className="mt-3 space-y-1">
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>Monthly quota</span>
+        <span>{used.toLocaleString()} / {quota.limit.toLocaleString()} used</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function MaskedKey({ value }: { value: string }) {
   const [revealed, setRevealed] = useState(false);
   return (
@@ -630,6 +677,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                                 ⚠️ <strong>Previous key expires</strong> {new Date(sub.oldKeyExpiry).toLocaleString()} — update your integration before then.
                               </div>
                             )}
+                            <QuotaBar apiKey={sub.apiKey} planId={sub.planId} />
                           </div>
                         )}
                         {sub.status === "suspended" && (
