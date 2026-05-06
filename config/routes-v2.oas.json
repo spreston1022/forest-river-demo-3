@@ -65,6 +65,7 @@
               "revocation-check-inbound",
               "plan-access-catalog",
               "plan-rate-limit-inbound",
+              "plan-quota-inbound",
               "mock-api-inbound"
             ]
           }
@@ -296,6 +297,7 @@
               "revocation-check-inbound",
               "plan-access-catalog",
               "plan-rate-limit-inbound",
+              "plan-quota-inbound",
               "mock-api-inbound"
             ]
           }
@@ -441,6 +443,7 @@
               "revocation-check-inbound",
               "plan-access-catalog",
               "plan-rate-limit-inbound",
+              "plan-quota-inbound",
               "mock-api-inbound"
             ]
           }
@@ -609,6 +612,7 @@
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
+              "plan-quota-inbound",
               "mock-api-inbound"
             ]
           }
@@ -696,6 +700,7 @@
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
+              "plan-quota-inbound",
               "mock-api-inbound"
             ]
           }
@@ -784,6 +789,7 @@
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
+              "plan-quota-inbound",
               "mock-api-inbound"
             ]
           }
@@ -893,6 +899,7 @@
               "revocation-check-inbound",
               "plan-access-commerce",
               "plan-rate-limit-inbound",
+              "plan-quota-inbound",
               "mock-api-inbound"
             ]
           }
