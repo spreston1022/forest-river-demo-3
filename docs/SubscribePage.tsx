@@ -522,7 +522,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
             <div key={tier}>
               <div className="flex items-center gap-3 mb-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {tier === "free" ? "Free Tier — Auto-approved" : "Paid Plans — Admin review"}
+                  {tier === "free" ? "Free Tier" : "Paid Plans — Admin review"}
                 </p>
                 <div className="flex-1 h-px bg-border" />
               </div>
