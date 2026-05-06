@@ -89,6 +89,42 @@
         }
       }
     },
+    "/subscriptions/{id}/activate": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Activate an approved subscription",
+        "operationId": "activate-subscription",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "activateSubscription",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription activated and API key returned"
+          },
+          "400": {
+            "description": "Not in approved state"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/admin/subscriptions": {
       "x-zuplo-path": {
         "pathMode": "open-api"

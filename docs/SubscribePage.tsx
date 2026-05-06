@@ -25,7 +25,7 @@ interface Subscription {
   id: string;
   planId: "catalog" | "commerce" | "pro" | "enterprise" | string;
   planName: string;
-  status: "pending" | "active" | "rejected" | "suspended" | "approved_pending_payment";
+  status: "pending" | "active" | "rejected" | "suspended" | "approved_pending_payment" | "approved";
   apiKey?: string;
   oldKeyExpiry?: string;
   requestedAt: string;
@@ -284,6 +284,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
   const [rollingKey, setRollingKey] = useState<string | null>(null);
   const [completingCheckout, setCompletingCheckout] = useState<string | null>(null);
+  const [activating, setActivating] = useState<string | null>(null);
   const auth = useAuth();
   const { authentication } = useZudoku();
 
@@ -319,7 +320,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   useEffect(() => { if (auth.isAuthenticated) fetchSubscriptions(); }, [auth.isAuthenticated, fetchSubscriptions]);
 
   useEffect(() => {
-    const hasPending = subscriptions.some(s => s.status === "pending" || s.status === "approved_pending_payment");
+    const hasPending = subscriptions.some(s => s.status === "pending" || s.status === "approved_pending_payment" || s.status === "approved");
     if (!hasPending) return;
     const interval = setInterval(fetchSubscriptions, 5000);
     return () => clearInterval(interval);
@@ -391,6 +392,22 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
       showToast("Failed to start checkout. Please try again.", "error");
       setCompletingCheckout(null);
     }
+  };
+
+  const handleActivate = async (sub: Subscription) => {
+    setActivating(sub.id);
+    try {
+      const res = await authFetch(`${GATEWAY_URL}/subscriptions/${sub.id}/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data: Subscription = await res.json();
+      setSubscriptions(prev => prev.map(s => s.id === sub.id ? data : s));
+      showToast(`✅ ${sub.planName} API key activated!`, "success");
+    } catch (err: any) {
+      showToast(`Activation failed: ${err.message}`, "error");
+    } finally { setActivating(null); }
   };
 
   const handleRollKey = async (sub: Subscription) => {
@@ -511,6 +528,14 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                             </button>
                           </div>
                         )}
+                        {sub?.status === "approved" && (
+                          <div className="rounded-lg border border-green-500 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950">
+                            <p className="text-xs font-medium text-green-800 dark:text-green-300 mb-1.5">✅ Approved — activate to get your API key</p>
+                            <button onClick={() => setView("subscriptions")} className="text-xs text-green-700 dark:text-green-400 underline hover:no-underline">
+                              Activate now →
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -567,9 +592,14 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                             sub.status === "active" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
                             sub.status === "suspended" ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300" :
                             sub.status === "approved_pending_payment" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" :
+                            sub.status === "approved" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" :
                             "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
                           }`}>
-                            {sub.status === "active" ? "Active" : sub.status === "suspended" ? "Suspended" : sub.status === "approved_pending_payment" ? "Approved" : "Pending"}
+                            {sub.status === "active" ? "Active" :
+                             sub.status === "suspended" ? "Suspended" :
+                             sub.status === "approved_pending_payment" ? "Approved" :
+                             sub.status === "approved" ? "Ready to Activate" :
+                             "Pending"}
                           </span>
                         </div>
                         <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
@@ -624,6 +654,20 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                               className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
                             >
                               {completingCheckout === sub.id ? "Redirecting to Stripe…" : "Complete subscription →"}
+                            </button>
+                          </div>
+                        )}
+                        {sub.status === "approved" && (
+                          <div className="mt-4 rounded-lg border border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950 p-4">
+                            <p className="text-sm font-medium text-green-800 dark:text-green-300 mb-3">
+                              ✅ Your access has been approved — click below to activate and get your API key
+                            </p>
+                            <button
+                              onClick={() => handleActivate(sub)}
+                              disabled={activating === sub.id}
+                              className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                            >
+                              {activating === sub.id ? "Activating…" : "Activate API Key →"}
                             </button>
                           </div>
                         )}
