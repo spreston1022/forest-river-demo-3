@@ -56,64 +56,34 @@ const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoti
 const VOLUME_OPTIONS = ["< 10,000 / month", "10,000 – 100,000 / month", "100,000 – 1,000,000 / month", "> 1,000,000 / month"];
 
 
-const PLAN_PROBE: Record<string, string> = {
-  catalog: "/v2/vehicles",
-  commerce: "/v2/pricing",
-  pro: "/v2/vehicles",
-  enterprise: "/v2/vehicles",
+const PLAN_QUOTA_LIMITS: Record<string, number | null> = {
+  catalog:    500_000,
+  commerce:   500_000,
+  pro:      5_000_000,
+  enterprise:      null, // unlimited
 };
 
-function QuotaBar({ apiKey, planId }: { apiKey: string; planId: string }) {
-  const [quota, setQuota] = useState<{ remaining: number; limit: number } | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+function QuotaBar({ planId, used = 0 }: { planId: string; used?: number }) {
+  const limit = PLAN_QUOTA_LIMITS[planId] ?? 500_000;
+  if (limit === null) return null;
 
-  useEffect(() => {
-    const endpoint = PLAN_PROBE[planId] ?? "/v2/vehicles";
-    fetch(`${GATEWAY_URL}${endpoint}`, { headers: { Authorization: `Bearer ${apiKey}` } })
-      .then((res) => {
-        const allHeaders: Record<string, string> = {};
-        res.headers.forEach((value, key) => { allHeaders[key] = value; });
-        console.log("[QuotaBar] status:", res.status, "headers:", allHeaders);
-        const remaining = parseInt(
-          res.headers.get("RateLimit-Remaining") ??
-          res.headers.get("X-RateLimit-Remaining") ??
-          res.headers.get("x-ratelimit-remaining") ??
-          res.headers.get("ratelimit-remaining") ??
-          res.headers.get("X-Rate-Limit-Remaining") ?? ""
-        );
-        const limit = parseInt(
-          res.headers.get("RateLimit-Limit") ??
-          res.headers.get("X-RateLimit-Limit") ??
-          res.headers.get("x-ratelimit-limit") ??
-          res.headers.get("ratelimit-limit") ??
-          res.headers.get("X-Rate-Limit-Limit") ?? ""
-        );
-        console.log("[QuotaBar] remaining:", remaining, "limit:", limit);
-        if (!isNaN(remaining) && !isNaN(limit) && limit > 0) {
-          setQuota({ remaining, limit });
-          setStatus("ready");
-        } else {
-          setStatus("unavailable");
-        }
-      })
-      .catch((err) => { console.log("[QuotaBar] probe failed:", err); setStatus("unavailable"); });
-  }, [apiKey, planId]);
-
-  if (status === "loading") return <div className="mt-3 text-xs text-muted-foreground animate-pulse">Loading quota…</div>;
-  if (status === "unavailable" || !quota) return null;
-
-  const used = quota.limit - quota.remaining;
-  const pct = Math.min((used / quota.limit) * 100, 100);
+  const pct = Math.min((used / limit) * 100, 100);
+  const remaining = limit - used;
   const barColor = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-amber-500" : "bg-primary";
 
   return (
-    <div className="mt-3 space-y-1">
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>Monthly quota</span>
-        <span>{used.toLocaleString()} / {quota.limit.toLocaleString()} used</span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+    <div className="mt-4">
+      <p className="text-sm font-semibold mb-2">Usage</p>
+      <div className="rounded-lg border bg-card p-4">
+        <p className="font-semibold text-sm mb-3">API Requests</p>
+        <div className="flex justify-between text-sm mb-2">
+          <span>{used.toLocaleString()} used</span>
+          <span className="font-semibold">{limit.toLocaleString()} limit</span>
+        </div>
+        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">{remaining.toLocaleString()} remaining this billing period</p>
       </div>
     </div>
   );
@@ -698,7 +668,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                                 </div>
                               </div>
                             )}
-                            <QuotaBar apiKey={sub.apiKey} planId={sub.planId} />
+                            <QuotaBar planId={sub.planId} />
                           </div>
                         )}
                         {sub.status === "suspended" && (
