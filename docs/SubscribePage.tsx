@@ -29,6 +29,7 @@ interface Subscription {
   apiKey?: string;
   oldKey?: string;
   oldKeyExpiry?: string;
+  requestCount?: number;
   requestedAt: string;
   resolvedAt?: string;
   companyName?: string;
@@ -57,8 +58,8 @@ const VOLUME_OPTIONS = ["< 10,000 / month", "10,000 – 100,000 / month", "100,0
 
 
 const PLAN_QUOTA_LIMITS: Record<string, number | null> = {
-  catalog:    500_000,
-  commerce:   500_000,
+  catalog:     50_000,
+  commerce:    50_000,
   pro:      5_000_000,
   enterprise:      null, // unlimited
 };
@@ -668,7 +669,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                                 </div>
                               </div>
                             )}
-                            <QuotaBar planId={sub.planId} />
+                            <QuotaBar planId={sub.planId} used={sub.requestCount ?? 0} />
                           </div>
                         )}
                         {sub.status === "suspended" && (

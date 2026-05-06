@@ -22,6 +22,6 @@ export function quota(
     case "commerce":
     case "basic":
     default:
-      return { key: user.sub, requestsAllowed: 500_000, timeWindowMinutes: MONTH };
+      return { key: user.sub, requestsAllowed: 50_000, timeWindowMinutes: MONTH };
   }
 }
