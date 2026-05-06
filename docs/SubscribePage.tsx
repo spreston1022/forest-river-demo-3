@@ -54,45 +54,6 @@ const PLANS: Plan[] = [
 const USE_CASES = ["Inventory sync", "Order management", "Dealer pricing & quoting", "Reporting & analytics", "Customer portal integration", "Other"];
 const VOLUME_OPTIONS = ["< 10,000 / month", "10,000 – 100,000 / month", "100,000 – 1,000,000 / month", "> 1,000,000 / month"];
 
-interface QuotaState { limit: number; remaining: number; reset: number; }
-
-function QuotaBar({ apiKey }: { apiKey: string }) {
-  const [quota, setQuota] = useState<QuotaState | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`${GATEWAY_URL}/me/quota`, {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          credentials: "omit",
-        });
-        const data = await res.json() as QuotaState;
-        if (data.limit > 0) setQuota(data);
-        else setError(true);
-      } catch { setError(true); }
-    })();
-  }, [apiKey]);
-
-  if (error || !quota) return <div className="mt-3 text-xs text-muted-foreground">Quota unavailable</div>;
-
-  const used = quota.limit - quota.remaining;
-  const pct = Math.min((used / quota.limit) * 100, 100);
-  const barColor = pct >= 90 ? "bg-red-500" : pct >= 60 ? "bg-amber-400" : "bg-primary";
-  const resetDays = Math.ceil(quota.reset / 86400);
-
-  return (
-    <div className="mt-3 space-y-1">
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span><span className="font-medium text-foreground">{used.toLocaleString()}</span> / {quota.limit.toLocaleString()} requests this month</span>
-        <span>Resets in ~{resetDays}d</span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
 
 function MaskedKey({ value }: { value: string }) {
   const [revealed, setRevealed] = useState(false);
@@ -662,7 +623,7 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
                                   {rollingKey === sub.id ? "Rolling…" : "Roll Key"}
                                 </button>
                               </div>
-                              <QuotaBar apiKey={sub.apiKey} />
+
                             </div>
                             {sub.oldKeyExpiry && new Date(sub.oldKeyExpiry) > new Date() && (
                               <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">

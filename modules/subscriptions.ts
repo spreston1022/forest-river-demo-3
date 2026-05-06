@@ -757,12 +757,6 @@ export async function adminOffboardSubscription(request: ZuploRequest, context: 
   return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
-/** POST /subscriptions/roll-key  body: { subscriptionId: string } — consumer self-service */
-/** GET /me/quota — returns quota usage via outbound policy body injection */
-export async function quotaHandler(request: ZuploRequest, context: ZuploContext) {
-  return new Response(JSON.stringify({}), { status: 200, headers: { "Content-Type": "application/json" } });
-}
-
 export async function rollMyKey(request: ZuploRequest, context: ZuploContext) {
   if (!request.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   const userId = request.user.sub!;

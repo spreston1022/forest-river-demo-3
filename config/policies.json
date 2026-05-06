@@ -173,14 +173,6 @@
       }
     },
     {
-      "name": "quota-outbound",
-      "policyType": "custom-code-outbound",
-      "handler": {
-        "export": "default",
-        "module": "$import(./modules/quota-outbound)"
-      }
-    },
-    {
       "name": "monetization-inbound",
       "policyType": "monetization-inbound",
       "handler": {
@@ -232,7 +224,7 @@
           ],
           "problem": {
             "type": "https://httpproblems.com/http-status/503",
-            "title": "Scheduled Brownout — API v1 Retiring May 30, 2026",
+            "title": "Scheduled Brownout \u2014 API v1 Retiring May 30, 2026",
             "detail": "Forest River API v1 is being retired on May 30, 2026. This brownout is a scheduled reminder to migrate to v2. See https://forest-river-demo-main-fb06bf1.zuplo.site/api for the migration guide.",
             "status": "503"
           }
