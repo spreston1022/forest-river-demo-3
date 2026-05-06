@@ -13,7 +13,7 @@ const PORTAL_URL = "https://forest-river-demo-main-fb06bf1.zuplo.site";
 const STRIPE_PRICE_IDS: Record<string, string> = {
   catalog: "price_1TTpvPLNOfSyVPaCh1Y74XMw",
   commerce: "price_1TTpvlLNOfSyVPaC9PUBf7Sr",
-  pro: "price_1TTpxTLNOfSyVPaCB4MUaQ5a",
+  pro: "price_1TTxvHLNOfSyVPaCBrgXejLB",
   enterprise: "price_1TTpy5LNOfSyVPaCiQfabm92",
 };
 
