@@ -1025,7 +1025,6 @@
           },
           "policies": {
             "inbound": [
-              "kill-switch-mcp",
               "mcp-query-param-to-header-inbound",
               "api-key-inbound",
               "revocation-check-inbound"
