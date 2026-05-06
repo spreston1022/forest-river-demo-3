@@ -328,9 +328,30 @@ export function SubscribePage({ view: defaultView = "plans" }: { view?: "plans" 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "success") {
-      showToast("Subscription complete! Your API key will appear shortly.", "success");
       setView("subscriptions");
       window.history.replaceState({}, "", window.location.pathname);
+      // Provision key directly rather than waiting for Stripe webhook
+      (async () => {
+        try {
+          const subsRes = await authFetch(`${GATEWAY_URL}/subscriptions`);
+          const subs: Subscription[] = subsRes.ok ? await subsRes.json() : [];
+          const pending = subs.find(s => s.status === "approved_pending_payment");
+          if (pending) {
+            const res = await authFetch(`${GATEWAY_URL}/subscriptions/complete`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ subscriptionId: pending.id }),
+            });
+            if (res.ok) {
+              await fetchSubscriptions();
+              showToast("Subscription active! Your API key is ready.", "success");
+              return;
+            }
+          }
+        } catch { /* fall through */ }
+        await fetchSubscriptions();
+        showToast("Subscription complete! Your API key will appear shortly.", "success");
+      })();
     } else if (params.get("checkout") === "cancelled") {
       showToast("Checkout cancelled. You can try again from My Subscriptions.", "info");
       setView("subscriptions");

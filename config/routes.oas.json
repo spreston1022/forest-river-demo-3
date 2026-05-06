@@ -516,6 +516,39 @@
           }
         }
       }
+    },
+    "/subscriptions/complete": {
+      "x-zuplo-path": {
+        "pathMode": "open-api"
+      },
+      "post": {
+        "summary": "Complete checkout \u2014 provision key after Stripe redirect",
+        "operationId": "complete-checkout",
+        "x-internal": true,
+        "x-zuplo-route": {
+          "corsPolicy": "portal-cors",
+          "handler": {
+            "export": "completeCheckout",
+            "module": "$import(./modules/subscriptions)"
+          },
+          "policies": {
+            "inbound": [
+              "jwt-auth-inbound"
+            ]
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Key provisioned"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
     }
   }
 }
