@@ -67,9 +67,6 @@
               "plan-rate-limit-inbound",
               "plan-quota-inbound",
               "mock-api-inbound"
-            ],
-            "outbound": [
-              "expose-quota-headers-outbound"
             ]
           }
         },
@@ -302,9 +299,6 @@
               "plan-rate-limit-inbound",
               "plan-quota-inbound",
               "mock-api-inbound"
-            ],
-            "outbound": [
-              "expose-quota-headers-outbound"
             ]
           }
         },
@@ -451,9 +445,6 @@
               "plan-rate-limit-inbound",
               "plan-quota-inbound",
               "mock-api-inbound"
-            ],
-            "outbound": [
-              "expose-quota-headers-outbound"
             ]
           }
         },
@@ -623,9 +614,6 @@
               "plan-rate-limit-inbound",
               "plan-quota-inbound",
               "mock-api-inbound"
-            ],
-            "outbound": [
-              "expose-quota-headers-outbound"
             ]
           }
         },
@@ -714,9 +702,6 @@
               "plan-rate-limit-inbound",
               "plan-quota-inbound",
               "mock-api-inbound"
-            ],
-            "outbound": [
-              "expose-quota-headers-outbound"
             ]
           }
         },
@@ -806,9 +791,6 @@
               "plan-rate-limit-inbound",
               "plan-quota-inbound",
               "mock-api-inbound"
-            ],
-            "outbound": [
-              "expose-quota-headers-outbound"
             ]
           }
         },
@@ -919,9 +901,6 @@
               "plan-rate-limit-inbound",
               "plan-quota-inbound",
               "mock-api-inbound"
-            ],
-            "outbound": [
-              "expose-quota-headers-outbound"
             ]
           }
         },
@@ -1056,9 +1035,6 @@
               "mcp-query-param-to-header-inbound",
               "api-key-inbound",
               "revocation-check-inbound"
-            ],
-            "outbound": [
-              "expose-quota-headers-outbound"
             ]
           }
         },

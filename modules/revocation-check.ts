@@ -7,6 +7,31 @@ function zuploHeaders() {
   return { Authorization: `Bearer ${environment.API_KEY}`, "Content-Type": "application/json" };
 }
 
+function currentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+async function incrementUsage(consumerName: string, context: ZuploContext) {
+  try {
+    const url = `${BASE}/${environment.BUCKET_NAME}/consumers/${consumerName}`;
+    const res = await fetch(url, { headers: zuploHeaders() });
+    if (!res.ok) { context.log.warn(`[usage] GET failed: ${res.status}`); return; }
+    const data = await res.json() as { metadata?: Record<string, string> };
+    const meta = data.metadata ?? {};
+    const month = currentMonth();
+    const count = meta["requestCountMonth"] === month ? parseInt(meta["requestCount"] ?? "0") + 1 : 1;
+    context.log.info(`[usage] incrementing ${consumerName} to ${count}`);
+    const patchRes = await fetch(url, {
+      method: "PATCH",
+      headers: zuploHeaders(),
+      body: JSON.stringify({ metadata: { ...meta, requestCount: String(count), requestCountMonth: month } }),
+    });
+    if (!patchRes.ok) context.log.warn(`[usage] PATCH failed: ${await patchRes.text()}`);
+  } catch (err) {
+    context.log.error(`[usage] error: ${err}`);
+  }
+}
+
 export default async function(request: ZuploRequest, context: ZuploContext) {
   const user = request.user;
   if (!user) return request;
@@ -47,6 +72,8 @@ export default async function(request: ZuploRequest, context: ZuploContext) {
       }
     })());
   }
+
+  context.waitUntil(incrementUsage(consumerName, context));
 
   return request;
 }
