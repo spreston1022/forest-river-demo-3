@@ -17,6 +17,8 @@ const STRIPE_PRICE_IDS: Record<string, string> = {
   enterprise: "price_1TTpy5LNOfSyVPaCiQfabm92",
 };
 
+const METERING_BUCKET_ID = "bckt_2vednH8xqLal1GgMI5pLSoQQdHhxV5Fjt";
+
 // ─── Email via Resend ─────────────────────────────────────────────────────────
 
 async function sendEmail(to: string, subject: string, html: string, context: ZuploContext): Promise<void> {
@@ -182,6 +184,29 @@ async function verifyStripeWebhook(payload: string, sig: string, secret: string)
   const mac = await crypto.subtle.sign("HMAC", key, encoder.encode(signedPayload));
   const expected = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, "0")).join("");
   return expected === v1;
+}
+
+// ─── Zuplo metering API ───────────────────────────────────────────────────────
+
+async function createZuploMeteringSubscription(
+  userId: string,
+  planKey: string,
+  stripeCustomerId: string,
+  context: ZuploContext,
+): Promise<void> {
+  const res = await fetch(
+    `https://dev.zuplo.com/v3/metering/${METERING_BUCKET_ID}/subscriptions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${environment.API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ customerId: userId, planKey, stripeCustomerId }),
+    },
+  );
+  if (!res.ok) throw new Error(`Zuplo metering subscription failed: ${await res.text()}`);
+  context.log.info(`Zuplo metering subscription created: ${userId} on plan ${planKey}`);
 }
 
 // ─── Zuplo management API ─────────────────────────────────────────────────────
@@ -412,6 +437,8 @@ export async function adminApproveSubscription(request: ZuploRequest, context: Z
     return new Response(JSON.stringify({ error: "No price configured for plan: " + planId }), { status: 500 });
   }
   const stripeSubscriptionId = await createStripeSubscription(stripeCustomerId, priceId);
+  const userId = existing.metadata?.["userId"] ?? "";
+  await createZuploMeteringSubscription(userId, planId, stripeCustomerId, context);
   const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Approved subscription key" }) as { key: string };
   const updated = await zuploPatch(`/consumers/${consumerName}`, {
     tags: { ...existing.tags, status: "active" },
@@ -487,13 +514,18 @@ export async function handleStripeWebhook(request: ZuploRequest, context: ZuploC
       try {
         const existing = await getConsumerWithKey(consumerName);
         if (existing.tags?.["status"] === "approved_pending_payment") {
+          const stripeSubscriptionId = (session["subscription"] as string) ?? "";
+          const stripeCustomerId = existing.metadata?.["stripeCustomerId"] ?? (session["customer"] as string) ?? "";
+          const userId = existing.metadata?.["userId"] ?? "";
+          const planId = existing.tags?.["plan"] ?? "";
+          await createZuploMeteringSubscription(userId, planId, stripeCustomerId, context);
           const keyData = await zuploPost(`/consumers/${consumerName}/keys`, { description: "Subscription key" }) as { key: string };
           await zuploPatch(`/consumers/${consumerName}`, {
             tags: { ...existing.tags, status: "active" },
             metadata: {
               ...existing.metadata,
               resolvedAt: new Date().toISOString(),
-              stripeSubscriptionId: (session["subscription"] as string) ?? "",
+              stripeSubscriptionId,
             },
           });
           const email = existing.metadata?.["email"] ?? "";
