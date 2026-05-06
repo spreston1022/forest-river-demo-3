@@ -249,7 +249,7 @@ async function createZuploMeteringSubscription(
   await getOrCreateMeteringCustomer(consumerName, userId, email, companyName, context);
   // Use customerKey directly (Auth0 sub) — no ULID lookup needed.
   // "plan" wraps the plan reference; "Create from plan" variant of the subscriptions endpoint.
-  await meteringPost("/subscriptions", { customerKey: userId, plan: { planKey } });
+  await meteringPost("/subscriptions", { customerKey: userId, plan: { key: planKey } });
   context.log.info(`Metering subscription created: ${consumerName} on plan ${planKey}`);
 }
 
